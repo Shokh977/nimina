@@ -6,7 +6,7 @@
  */
 import { FONTS, MODELS, SLIDE_DEFAULTS } from './constants';
 import { drawCutoutHollows, drawCutouts } from './cutouts';
-import { drawBadge, drawCallout, drawDevice, drawGesture, focusLocal } from './devices';
+import { drawBadge, drawCallout, drawCounter, drawDevice, drawGesture, focusLocal } from './devices';
 import { drawEffect } from './effects';
 import { drawWords, layoutWords, textDur } from './text';
 import type { AssetMap, EffectBox, Format, FontDef, ImageAsset, ImageSlide, LayoutRegion, ModelKey, Project, ResolvedStyle, Slide, TextPos, TextSlide } from './types';
@@ -224,6 +224,15 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
       drawBadge(ctx, scene.badge, bsize, -0.08 + Math.sin(local * 1.8) * 0.03, alpha * (1 - zp / 0.3) * clamp(be), style, font);
       ctx.restore();
     }
+  }
+
+  if (scene.counter && img && zp < 0.3) {
+    const f = focusLocal({ x: scene.counter.x, y: scene.counter.y }, img, PW, PH, scroll, style.model),
+      cs = Math.cos(rot),
+      sn = Math.sin(rot);
+    const tx = px + (f.x * cs - f.y * sn) * S,
+      ty = py + (f.x * sn + f.y * cs) * S;
+    drawCounter(ctx, scene.counter, local, tx, ty, alpha * (1 - zp / 0.3), W, H, style, font);
   }
 
   const hl = layoutWords(ctx, scene.headline, L.textW, L.hSize, font.name, font.h);

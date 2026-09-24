@@ -5,7 +5,8 @@
  * drawBadge/drawCallout.
  */
 import { FCOLORS, MODELS } from './constants';
-import type { FontDef, FrameColorId, FrameColorResolved, ImageAsset, ImgRect, ModelKey, ResolvedStyle, ScreenBox, ImageSlide } from './types';
+import { resolveEasing } from './story/easing';
+import type { CounterConfig, FontDef, FrameColorId, FrameColorResolved, ImageAsset, ImgRect, ModelKey, ResolvedStyle, ScreenBox, ImageSlide } from './types';
 import { clamp, cover, easeInOutCubic, easeOutBack, easeOutCubic, fontStr, imgH, imgW, rgba, rr, shade, slug } from './utils';
 
 export function screenBox(PW: number, PH: number, model: ModelKey) {
@@ -344,6 +345,54 @@ export function drawBadge(ctx: CanvasRenderingContext2D, text: string, size: num
   ctx.fillText(text, 0, size * 0.05);
   ctx.restore();
   ctx.textAlign = 'left';
+}
+
+/** `value.from`/`value.to` are the raw numeric endpoints — for 'percent'
+ * that's the percent number itself (87, not 0.87), so this never divides
+ * by 100. Thousands separators are hand-rolled (not Intl.NumberFormat) so
+ * 'percent' can mean "the number, then a % sign" without fighting Intl's
+ * own fraction-based percent semantics. */
+export function formatCounterValue(value: number, cfg: Pick<CounterConfig, 'format' | 'currencySymbol' | 'decimals'>): string {
+  const sign = value < 0 ? '-' : '';
+  const [intPart, fracPart] = Math.abs(value).toFixed(cfg.decimals).split('.');
+  const withSeparators = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const num = fracPart ? `${withSeparators}.${fracPart}` : withSeparators;
+  if (cfg.format === 'currency') return `${sign}${cfg.currencySymbol}${num}`;
+  if (cfg.format === 'percent') return `${sign}${num}%`;
+  return `${sign}${num}`;
+}
+
+/** Current value of a counter at slide-local time `local` — exported
+ * separately from the draw function so callers (and tests) can sample the
+ * numeric value without a canvas. Progress clamps to exactly 1 once
+ * `local >= cfg.at + cfg.duration`, and every named easing function in
+ * story/easing.ts returns exactly 1 at input 1 (checked directly, not
+ * assumed), so the value lands exactly on `cfg.to` and stays there — never
+ * one frame short from an unclamped/approaching-but-not-reaching curve. */
+export function counterValueAt(cfg: CounterConfig, local: number): number {
+  const progress = clamp((local - cfg.at) / cfg.duration);
+  const eased = resolveEasing(cfg.easing)(progress);
+  return cfg.from + (cfg.to - cfg.from) * eased;
+}
+
+export function drawCounter(ctx: CanvasRenderingContext2D, cfg: CounterConfig, local: number, tx: number, ty: number, alpha: number, W: number, H: number, style: ResolvedStyle, font: FontDef): void {
+  if (local < cfg.at || alpha <= 0) return;
+  const text = formatCounterValue(counterValueAt(cfg, local), cfg);
+  const c = style.colors,
+    size = Math.min(W, H) * 0.06;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = fontStr(font.h, size, font.name);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,.35)';
+  ctx.shadowBlur = size * 0.5;
+  ctx.shadowOffsetY = size * 0.06;
+  ctx.fillStyle = c.text;
+  ctx.fillText(text, tx, ty);
+  ctx.restore();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
 }
 
 export function drawCallout(

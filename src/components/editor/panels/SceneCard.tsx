@@ -2,9 +2,9 @@
 
 import { useRef } from 'react';
 
-import { ANIMS, CAMERAS, DURS, EFFECTS, GESTURES, LAYOUTS } from '@/engine/constants';
+import { ANIMS, CAMERAS, DEFAULT_COUNTER, DURS, EFFECTS, GESTURES, LAYOUTS } from '@/engine/constants';
 import { resolveStyle } from '@/engine/render';
-import type { ClassicSlide, Effect, ImageSlide, Slide } from '@/engine/types';
+import type { ClassicSlide, CounterConfig, CounterFormat, Effect, ImageSlide, Slide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { isPro, PRO_ONLY_EFFECTS } from '@/lib/plan';
 import { createClient } from '@/lib/supabase/client';
@@ -202,6 +202,12 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
         </Details>
       )}
 
+      {image && (
+        <Details summary={`Counter${image.counter ? ' (on)' : ''}`}>
+          <CounterEditor slide={image} setF={setF} />
+        </Details>
+      )}
+
       <StyleEditor
         title="Style for this slide"
         keys={isText ? KEYS_TEXT : KEYS_IMAGE}
@@ -318,6 +324,114 @@ function TextEffectsFields({
         </Field>
       )}
     </div>
+  );
+}
+
+const COUNTER_FORMATS: Array<[CounterFormat, string]> = [
+  ['integer', 'Number'],
+  ['currency', 'Currency'],
+  ['percent', 'Percent'],
+];
+const EASING_OPTIONS: Array<[CounterConfig['easing'], string]> = [
+  ['easeOutCubic', 'Ease out'],
+  ['easeOutBack', 'Ease out (overshoot)'],
+  ['easeInCubic', 'Ease in'],
+  ['easeInOutCubic', 'Ease in-out'],
+  ['linear', 'Linear'],
+];
+
+/** Animated count-up number overlay — see CounterConfig in engine/types.ts.
+ * `null` (off) is the common case; enabling starts from DEFAULT_COUNTER and
+ * every field below patches just that one property, same pattern as
+ * StyleEditor's per-field onChange. */
+function CounterEditor({ slide, setF }: { slide: ImageSlide; setF: <K extends keyof ClassicSlide>(key: K, value: ClassicSlide[K]) => void }) {
+  const counter = slide.counter;
+  const patch = (partial: Partial<CounterConfig>) => {
+    if (!counter) return;
+    setF('counter', { ...counter, ...partial });
+  };
+
+  return (
+    <div className="grid gap-2.5">
+      <label className="flex items-center gap-2 text-[13.5px] font-semibold">
+        <input type="checkbox" checked={!!counter} onChange={(e) => setF('counter', e.target.checked ? DEFAULT_COUNTER : null)} className="h-[18px] w-[18px] accent-indigo-600" />
+        Add an animated count-up number
+      </label>
+      {counter && (
+        <>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label="From">
+              <NumberInput value={counter.from} onChange={(v) => patch({ from: v })} />
+            </Field>
+            <Field label="To">
+              <NumberInput value={counter.to} onChange={(v) => patch({ to: v })} />
+            </Field>
+            <Field label="Format">
+              <Select value={counter.format} onChange={(v) => patch({ format: v as CounterFormat })} options={COUNTER_FORMATS} />
+            </Field>
+            {counter.format === 'currency' ? (
+              <Field label="Symbol">
+                <input
+                  type="text"
+                  value={counter.currencySymbol}
+                  maxLength={3}
+                  onChange={(e) => patch({ currencySymbol: e.target.value })}
+                  className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
+                />
+              </Field>
+            ) : (
+              <span />
+            )}
+            <Field label="Decimal places">
+              <NumberInput value={counter.decimals} min={0} max={4} step={1} onChange={(v) => patch({ decimals: Math.round(v) })} />
+            </Field>
+            <Field label="Duration (s)">
+              <NumberInput value={counter.duration} min={0.1} step={0.1} onChange={(v) => patch({ duration: Math.max(0.1, v) })} />
+            </Field>
+            <Field label="Starts at (s into slide)">
+              <NumberInput value={counter.at} min={0} step={0.1} onChange={(v) => patch({ at: Math.max(0, v) })} />
+            </Field>
+            <Field label="Easing">
+              <Select value={counter.easing} onChange={(v) => patch({ easing: v as CounterConfig['easing'] })} options={EASING_OPTIONS} />
+            </Field>
+            <Field label="Position X (0-1)">
+              <NumberInput value={counter.x} min={0} max={1} step={0.01} onChange={(v) => patch({ x: v })} />
+            </Field>
+            <Field label="Position Y (0-1)">
+              <NumberInput value={counter.y} min={0} max={1} step={0.01} onChange={(v) => patch({ y: v })} />
+            </Field>
+          </div>
+          <p className="text-[12.5px] text-neutral-500 dark:text-neutral-400">
+            Preview: <b>{formatPreview(counter)}</b>
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function formatPreview(counter: CounterConfig): string {
+  const decimals = counter.decimals;
+  const num = counter.to.toFixed(decimals);
+  if (counter.format === 'currency') return `${counter.currencySymbol}${num}`;
+  if (counter.format === 'percent') return `${num}%`;
+  return num;
+}
+
+function NumberInput({ value, onChange, min, max, step = 1 }: { value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
+  return (
+    <input
+      type="number"
+      value={value}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(e) => {
+        const v = Number(e.target.value);
+        if (!Number.isNaN(v)) onChange(v);
+      }}
+      className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
+    />
   );
 }
 

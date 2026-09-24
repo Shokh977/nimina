@@ -171,6 +171,32 @@ export interface CutoutLayer {
   stackIndex: number;
 }
 
+export type CounterFormat = 'integer' | 'currency' | 'percent';
+
+/**
+ * An animated count-up number overlaid on a slide (a balance ticking up,
+ * likes/XP incrementing, a percentage climbing). `from`/`to` are the raw
+ * numeric endpoints regardless of format — for 'percent' that means the
+ * percent number itself (0 to 87 reads "87%", not a 0-1 fraction), for
+ * 'currency' the plain amount (`currencySymbol` is prepended separately).
+ * Positioned the same way callout/gesture are (`x`/`y` normalized 0-1
+ * within the screenshot, resolved via the same `focusLocal` helper), timed
+ * the same way a cutout is (`at`/`duration` in seconds within the slide).
+ */
+export interface CounterConfig {
+  from: number;
+  to: number;
+  format: CounterFormat;
+  /** Only used when format === 'currency'. */
+  currencySymbol: string;
+  decimals: number;
+  at: number;
+  duration: number;
+  easing: EasingName;
+  x: number;
+  y: number;
+}
+
 interface SlideBase {
   id: number;
   headline: string;
@@ -194,6 +220,10 @@ interface SlideBase {
    * TextSlide/StorySlide, which have no single screenshot to draw one from
    * (only ImageSlide's UI ever creates these). */
   cutouts: CutoutLayer[];
+  /** null = no counter on this slide (the common case) — same "absent
+   * object" convention as `iconAssetId`, not an empty-string sentinel like
+   * badge/callout, since there's no single scalar default that means off. */
+  counter: CounterConfig | null;
   style: SlideStyle;
 }
 

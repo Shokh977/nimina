@@ -7,6 +7,7 @@ import type {
   BgPattern,
   Camera,
   ColorPreset,
+  CounterConfig,
   CutoutPreset,
   Effect,
   FontDef,
@@ -36,6 +37,13 @@ export const PRESETS: ColorPreset[] = [
   { name: 'Night', a: '#2B2F3A', b: '#0E1015', text: '#F3F4F7', accent: '#7CF0FF' },
   { name: 'Paper', a: '#F7F4EE', b: '#E0D8C8', text: '#1E1C19', accent: '#FF5A36' },
   { name: 'Grape', a: '#8B5CF6', b: '#3B0F7A', text: '#FFFFFF', accent: '#F9A8D4' },
+  // Appended (not inserted) — Project.preset is a literal index into this
+  // array, so anything above must keep its position. Added for the
+  // Nimina Template Pack (docs/TEMPLATE_PACK.md §4).
+  { name: 'Sunset', a: '#FF7A59', b: '#7A2BFF', text: '#FFFFFF', accent: '#FFE066' },
+  { name: 'Midnight', a: '#0F1B3D', b: '#050912', text: '#F3F4FF', accent: '#7CF0FF' },
+  { name: 'Candy', a: '#FFE3EC', b: '#FF6FB0', text: '#2A1030', accent: '#FF3E7F' },
+  { name: 'Aurora', a: '#3EC5FF', b: '#8B5CF6', text: '#FFFFFF', accent: '#FFE066' },
 ];
 
 export const FONTS: FontDef[] = [
@@ -141,6 +149,22 @@ export const SLIDE_DEFAULTS = {
   effect: 'none' as Effect,
   stickers: '🔥⭐💯',
   scroll: false,
+  counter: null as CounterConfig | null,
+};
+
+/** Starting values when a user first enables a counter in the editor —
+ * templates override every field as needed. */
+export const DEFAULT_COUNTER: CounterConfig = {
+  from: 0,
+  to: 100,
+  format: 'integer',
+  currencySymbol: '$',
+  decimals: 0,
+  at: 0.3,
+  duration: 1.2,
+  easing: 'easeOutCubic',
+  x: 0.5,
+  y: 0.5,
 };
 
 export const CUTOUT_PRESETS: Array<[CutoutPreset, string]> = [
