@@ -97,6 +97,19 @@ behavior. It is a fully self-contained, dependency-free page:
 
 This is a proposal, not final — confirm before scaffolding.
 
+## Engine v2 (paused)
+
+A from-scratch, pure-TypeScript, Three.js/WebGL rendering engine was
+explored as a possible eventual replacement for the classic canvas engine
+below — real 3D camera/depth/lighting, a template-driven content system, a
+parallel `/editor2` shell. That work is paused, not deleted: it's preserved
+whole on the `engine-v2-wip` branch (see that branch's `STATUS.md` for what
+worked, what was broken, and what was mid-flight when it paused). **The
+classic engine (`src/engine/`, `/editor`) described below is the sole
+shipping engine on `main`.** Nothing under `src/engine2/`, `/editor2`, or
+`src/components/editorV2/` exists on this branch — if you're looking for
+that code, check out `engine-v2-wip`.
+
 ## Rules for all future work in this repo
 
 1. **Preserve the prototype's rendering behavior and visual output exactly**
@@ -118,32 +131,23 @@ This is a proposal, not final — confirm before scaffolding.
 5. **If a decision is ambiguous, ask instead of guessing** (e.g., DB schema
    shape, pricing tiers, which Supabase features to use, exact route
    structure).
-6. **Every animation follows `docs/MOTION_GUIDE.md`.** Springs (not linear/
-   cubic easing, except continuous scroll/rotation), stagger, overlap,
-   anticipation, idle float, depth/shadow rules, camera behavior, kinetic
-   text reveal — all mandatory, in Engine v2 (`src/engine-v2/`) and in the
-   editor UI alike. `/dev/compare` exists specifically to catch drift from
-   this guide against `legacy/motion-lab-download.html`, the reference
-   implementation.
-7. **Every rendering-pipeline change (post-processing, color space, tone
-   mapping, compositing, materials) must be verified against BOTH a dark,
-   hand-tuned template palette AND a real near-white screenshot on a light
-   background** — not just one or the other. Three real bugs (a bloom pass
-   that glowed the entire screen instead of only bright highlights, a
-   selective-bloom fix that let the background bleed through and tint the
-   screenshot, and `OutputPass` silently re-applying ACES tone mapping
-   regardless of any per-material `toneMapped` flag) all shipped and went
-   unnoticed for a full session specifically because every test up to that
-   point used dark template content — light, near-white content is what
-   exposed all three, immediately and dramatically. `npm run
-   visual-regression` (`scripts/visual-regression.mjs`, driving
-   `/dev/visual-regression`) is the standing check for this: two fixture
-   projects (one dark-palette procedural template, one real light
-   screenshot in a device frame), sampling known pixel regions against
-   expected values in both preview and a real export. Run it after any
-   change that touches `src/engine2/camera.ts`, `sceneBuilder.ts`,
-   `grain.ts`, `watermark.ts`, or any material/shader/compositing code, and
-   whenever a template or the Motion Lab reference is re-tuned.
+6. **Every rendering-pipeline change (drawing code, overlays, or the export
+   pipeline) must be verified against the standing visual-regression
+   check**, not just eyeballed. `npm run visual-regression`
+   (`scripts/visual-regression.mjs`, driving `/dev/visual-regression`,
+   fixtures in `src/dev/visualRegressionFixtures.ts`) renders two fixture
+   projects (the classic multi-slide demo and the story-format demo) in
+   both live preview and a real export, sampling known pixel regions
+   against expected values. Preview catches drawing-code regressions;
+   export additionally catches color drift introduced by the video
+   encode/decode pipeline itself — WebCodecs H.264 limited/full-range and
+   color-matrix mismatches are a real, easy-to-miss bug class distinct from
+   anything wrong with the drawing code. Run it after any change touching
+   `src/engine/render.ts`, `src/engine/export/`, or any drawing/overlay
+   code. If a change is a deliberate visual update, re-calibrate the
+   fixtures' expected values against a real render (sample the actual
+   output, don't hand-compute) rather than loosening tolerances to make
+   them pass.
 
 ## Supabase setup
 

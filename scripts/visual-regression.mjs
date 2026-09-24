@@ -2,8 +2,8 @@
 /**
  * Standing visual-regression runner (CLAUDE.md rule 7) — headlessly drives
  * /dev/visual-regression, which does the actual rendering/sampling/
- * comparison (real code, real WebGL pipeline; this script is just the
- * automation shell around it). Requires `npm run dev` already running —
+ * comparison (real code, real canvas + export pipeline; this script is just
+ * the automation shell around it). Requires `npm run dev` already running —
  * this doesn't start or manage the dev server itself, matching every
  * other Playwright-driven check used during this project's development.
  *
@@ -65,7 +65,7 @@ async function main() {
     console.log('ALL PASS');
     process.exit(0);
   } else {
-    console.log('FAILURES — see above. Re-check the render pipeline (camera.ts, sceneBuilder.ts, grain.ts, watermark.ts) against CLAUDE.md rule 7.');
+    console.log('FAILURES — see above. Re-check the render pipeline (src/engine/render.ts, src/engine/export/) against CLAUDE.md rule 7.');
     process.exit(1);
   }
 }

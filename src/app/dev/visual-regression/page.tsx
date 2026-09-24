@@ -1,21 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import * as THREE from 'three';
 
-import { exportEngine2Video } from '@/engine2/export';
-import { buildEngineV2Scene } from '@/engine2/sceneBuilder';
-import { getRegressionFixtures, type RegressionSample } from '@/engine2/visualRegressionFixtures';
-import '@/engine2/registerAllContent';
+import { exportVideo } from '@/engine/export';
+import { render } from '@/engine/render';
+import { getRegressionFixtures, previewCanvasSize, type RegressionSample } from '@/dev/visualRegressionFixtures';
 
-const WIDTH = 480;
-const HEIGHT = Math.round((WIDTH * 1920) / 1080);
-// Preview is a direct, uncompressed GPU readback — tight tolerance catches
-// real regressions. Export goes through H.264, which is lossy by design
-// (measured ~1 point of rounding even on a fully correct pipeline — see
-// CLAUDE.md rule 7's before/after numbers), so it gets a looser one.
+// Preview is a direct, uncompressed canvas readback — tight tolerance
+// catches real regressions. Export goes through H.264, which is lossy by
+// design, so it gets a looser one.
 const PREVIEW_TOLERANCE_PAD = 0;
 const EXPORT_TOLERANCE_PAD = 6;
+const PREVIEW_SCALE = 0.5;
 
 interface SampleResult {
   label: string;
@@ -45,8 +41,8 @@ function readPixel(canvas: HTMLCanvasElement, xFrac: number, yFrac: number): [nu
   return [data[0], data[1], data[2]];
 }
 
-function checkSample(sample: RegressionSample, actual: [number, number, number], toleragePad: number): SampleResult {
-  const tolerance = sample.tolerance + toleragePad;
+function checkSample(sample: RegressionSample, actual: [number, number, number], tolerancePad: number): SampleResult {
+  const tolerance = sample.tolerance + tolerancePad;
   const pass = actual.every((v, i) => Math.abs(v - sample.expected[i]) <= tolerance);
   return { label: sample.label, expected: sample.expected, actual, tolerance, pass };
 }
@@ -74,12 +70,12 @@ async function decodeExportFrame(blob: Blob, atSeconds: number): Promise<HTMLCan
 
 /**
  * Standing visual-regression check (CLAUDE.md rule 7) — renders both
- * fixtures (visualRegressionFixtures.ts) in preview and in a real (short,
- * duration-trimmed for speed) export, samples known pixel regions, and
- * reports pass/fail against expected values. Driven interactively via the
- * button below, or headlessly by scripts/visual-regression.mjs (`npm run
- * visual-regression`), which reads `window.__visualRegressionResults`
- * after `window.__runVisualRegression()` resolves.
+ * fixtures (src/dev/visualRegressionFixtures.ts) in preview and in a real
+ * export, samples known pixel regions, and reports pass/fail against
+ * expected values. Driven interactively via the button below, or headlessly
+ * by scripts/visual-regression.mjs (`npm run visual-regression`), which
+ * reads `window.__visualRegressionResults` after
+ * `window.__runVisualRegression()` resolves.
  */
 export default function VisualRegressionPage() {
   const [results, setResults] = useState<FixtureResult[] | null>(null);
@@ -93,22 +89,20 @@ export default function VisualRegressionPage() {
       try {
         const { project, assets } = fixture.build();
 
-        // Preview: build, render at sampleAtT, read the canvas back directly.
+        // Preview: render at sampleAtT directly onto a canvas, read back.
+        const { width, height } = previewCanvasSize(project, PREVIEW_SCALE);
         const canvas = document.createElement('canvas');
-        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
-        const inst = buildEngineV2Scene(renderer, project, WIDTH, HEIGHT, { assets });
-        await inst.ready;
-        inst.update(fixture.sampleAtT);
-        await inst.awaitFrame(fixture.sampleAtT);
-        inst.render();
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        render(ctx, project, assets, fixture.sampleAtT, PREVIEW_SCALE);
         const preview = fixture.samples.map((s) => checkSample(s, readPixel(canvas, s.xFrac, s.yFrac), PREVIEW_TOLERANCE_PAD));
-        inst.dispose();
 
-        // Export: same project, duration trimmed to just past sampleAtT so
-        // the export stays fast (a handful of frames, not the full
-        // template length) while still exercising the real export pipeline.
-        const exportProject = { ...project, duration: fixture.sampleAtT + 0.1 };
-        const exportResult = await exportEngine2Video(exportProject, null, { resolution: '720p', assets }, new AbortController().signal);
+        // Export: same project, real export pipeline (WebCodecs, falling
+        // back to MediaRecorder), decoded back from the resulting file —
+        // exercises the exact color pipeline a user's download goes
+        // through, not just the live preview.
+        const exportResult = await exportVideo(project, assets, null, { resolution: '720p' }, new AbortController().signal);
         const frameCanvas = await decodeExportFrame(exportResult.blob, fixture.sampleAtT);
         const exportChecks = fixture.samples.map((s) => checkSample(s, readPixel(frameCanvas, s.xFrac, s.yFrac), EXPORT_TOLERANCE_PAD));
 
@@ -137,11 +131,11 @@ export default function VisualRegressionPage() {
     <div style={{ minHeight: '100vh', background: '#0B0B10', color: '#fff', fontFamily: 'system-ui, sans-serif', padding: 24 }}>
       <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Visual regression check</h1>
       <p style={{ fontSize: 13, color: '#9BA1B0', margin: '0 0 16px', maxWidth: 640 }}>
-        CLAUDE.md rule 7 — two fixtures (a dark, hand-tuned palette and a real near-white screenshot on a light background), sampled in both preview and a real export. Run after any
-        change touching camera.ts, sceneBuilder.ts, grain.ts, watermark.ts, or any material/shader/compositing code.
+        CLAUDE.md rule 7 — two fixtures (the classic multi-slide demo and the story-format demo), sampled in both preview and a real export. Run after any change touching
+        src/engine/render.ts, src/engine/export/, or any drawing/overlay code.
       </p>
       <button onClick={run} disabled={running} style={{ border: 0, borderRadius: 8, padding: '8px 14px', fontWeight: 700, background: '#6D5BFF', color: '#fff', opacity: running ? 0.6 : 1 }}>
-        {running ? 'Running… (exports take ~15-30s each)' : 'Run check'}
+        {running ? 'Running… (exports take a few seconds each)' : 'Run check'}
       </button>
       {results && (
         <div style={{ marginTop: 20, display: 'grid', gap: 16 }}>
@@ -160,9 +154,7 @@ export default function VisualRegressionPage() {
               )}
             </div>
           ))}
-          <div style={{ fontWeight: 800, fontSize: 14 }}>
-            {results.every((f) => !f.error && [...f.preview, ...f.export].every((s) => s.pass)) ? '✓ ALL PASS' : '✗ FAILURES ABOVE'}
-          </div>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>{results.every((f) => !f.error && [...f.preview, ...f.export].every((s) => s.pass)) ? '✓ ALL PASS' : '✗ FAILURES ABOVE'}</div>
         </div>
       )}
     </div>

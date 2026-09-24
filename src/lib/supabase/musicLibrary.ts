@@ -13,8 +13,7 @@ export interface MusicLibraryTrack {
   bpm: number;
   durationSeconds: number;
   category: string;
-  /** 'original' | 'cc0' | 'licensed' — see supabase/migrations/0011_music_license.sql
-   * and src/engine2/assetLicense.ts's AssetLicense (same three kinds). */
+  /** 'original' | 'cc0' | 'licensed' — see supabase/migrations/0011_music_license.sql. */
   license: string;
   licenseNote: string | null;
   author: string | null;
