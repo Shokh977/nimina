@@ -1,224 +1,380 @@
-# Template Pack — proposal
+# Nimina Template Pack — reconciled build spec
 
-**Status: draft, not yet built.** `docs/TEMPLATE_PACK.md` didn't exist before
-this — CLAUDE.md's Phase 4 instruction pointed at it as if it did. This is
-a from-scratch proposal, built from what the classic engine (`src/engine/`)
-actually supports, confirmed by the Phase 3 QA sweep: 6 device frames
-(island, notch, punch, tablet, browser, card), 6 frame colors (graphite,
-silver, titanium, midnight, rose, theme), 3 output formats (9:16, 1:1,
-16:9), 5 text animations (rise, pop, type, slide, letters), 5 transitions
-(none, wipe, flash, iris, bars), 3 highlight styles (marker, color,
-underline), 5 background patterns (glow, grid, dots, rays, waves), 4
-effects (none, confetti, sparkles, stickers), 5 camera moves (none, push,
-pull, drift, shake), 2 layouts (single, fan), story slides (a continuous
-phone shot driven by actions: launchApp, showScreen, loading, scroll, tap,
-longPress, swipe, typeText, highlight, notification, iconAnim, sprite,
-successCheck, wait), intro/outro screens, and background music with
-SFX-ducking.
+**Status: reconciled, not yet built.** Base is your spec (pasted in full
+below, all 10 templates preserved). My earlier draft moved to
+`docs/TEMPLATE_PACK_DRAFT.md` — its one contribution folded in here is the
+coverage guarantee (every device frame/color/text-anim/transition/
+highlight-style/effect/camera-move used at least once).
 
-**Review this before I build anything.** For each template below: does the
-concept fit, is the structure/pacing right, and is the color/style
-direction what you want? Flag anything to change — cheap to adjust now,
-expensive after 10 templates are built and rendered.
+I checked every beat in your spec against what `src/engine/` actually
+supports (types.ts, constants.ts, the story action system, the existing
+`TemplateDef`/wizard infrastructure in `src/engine/templates.ts` and
+`TemplateWizard.tsx`, which already does most of what your spec describes —
+named slots, hints, an upload wizard). Nothing in your spec was dropped.
+Where classic genuinely can't do something as written, it's called out
+below with the adaptation and why — not silently changed.
 
-Once approved, each template gets: implementation as a reusable classic-
-engine template definition, and a 10-second preview rendered in both 9:16
-and 16:9 for the template gallery and landing page (using real, licensable
-screenshot content — see the note on assets below).
+## 1. What's already there vs. what needs building
 
-## A note on preview assets
+Good news first: `TemplateDef { id, name, description, category, swatch,
+build() }` and `TemplateSlot { sceneId, label, hint }` already exist, and
+`/templates` already has a working gallery + upload wizard
+(`TemplateWizard.tsx`) that prompts for each slot in order and degrades
+gracefully when a slot is left empty (the scene just keeps `imgAssetId:
+null`, same as a manually-added blank slide) — that's most of your "Slots"
+and "upload wizard" rules for free, for the 6 existing simple templates.
 
-Phase 3's real-content QA used live-site screenshots (Wikipedia, Hacker
-News, GitHub, MDN) captured directly via Playwright — fine for internal
-testing, but not something to publish on a public gallery/landing page
-without checking attribution/licensing first. For these 10 previews I'll
-need either: your own screenshots (of a real or placeholder app), or
-procedurally-generated sample content in the same spirit as
-`src/dev/sampleProject.ts`'s `makeSample()` (fake, believable UI drawn on
-canvas — zero licensing risk, already the pattern the app itself uses to
-populate a brand-new project before a user uploads anything). I'd lean
-toward the latter for the gallery specifically, since it's guaranteed
-clean and I can design each sample screen to match its template's app
-category. Flag if you'd rather supply real screenshots instead.
+Four things in your spec need real additions, none of them touching
+`legacy/promo-studio.html` fidelity (this is new template-layer code, not
+a change to how any existing scene type renders):
 
----
+**a. Story-slide slots.** The current wizard only fills `ImageSlide.
+imgAssetId`. Half your templates (Fitness, Food delivery, Meal planning,
+Finance, Travel, Education) put a named slot *inside* a story slide
+(`StorySlide.screens[].assetId`), which the wizard has no path for today.
+Extending `TemplateSlot` to `{ sceneId, screenId?, label, hint }` (screenId
+present = "this slot fills a StoryScreen inside the story slide `sceneId`,
+not the slide's own image") and teaching `TemplateWizard.tsx`'s upload
+handler to route to the right place is a contained, mechanical change —
+not a rendering-engine change, just closing a gap in template
+infrastructure that was built for 6 simple templates and needs to cover
+story slides too.
 
-## 1. Reactions — social / messaging
+**b. Short-cut variant.** Nothing like this exists — every `TemplateDef`
+today has exactly one `build()`. I'll change the signature to
+`build(opts?: { variant?: 'full' | 'short' }) => { project, slots }`,
+where `short` omits every slide I've marked *(optional)* below (same
+convention your spec already uses). No type changes needed elsewhere —
+the function just returns a `Project` with fewer scenes.
 
-**Pitch:** a chat app's reaction feature, playful and kinetic.
+**c. Strings map.** Copy is inline on `Project`/`Slide` objects today
+(`headline: 'Every set, counted'` baked directly into the built object) —
+translating means editing the timeline. I'll add a
+`build(opts?: { variant?, strings? })` parameter: each template file
+exports its own `Strings` type and a `DEFAULT_STRINGS: Strings` (English),
+and `build()` reads from whatever strings object it's given, defaulting to
+English. Translating a template means passing a different `Strings`
+object in; the scene list itself never changes. Pure authoring
+convention, no engine changes.
 
-- Format: 9:16 primary (chat UI reads naturally tall); 16:9 gallery render
-  crops/reflows via the existing format system, no template changes needed.
-- Device: `island`, `graphite`. Colors: a violet/pink preset (new —
-  `#6D5BFF` → `#FF6FD8`).
-- Structure: intro (tagline) → 2 image slides (chat screen, reaction burst
-  moment) → text slide (kinetic callout) → outro.
-- Text anim: `pop`. Transition: `flash`. Highlight: `marker`.
-- Effect: `stickers` (emoji) on the reaction-burst slide. Camera: `push` on
-  the hero slide for emphasis.
-- Gesture: `tap` overlay on the reaction slide (shows *why* the burst
-  happened).
+**d. Numeric counter overlay — flagging, not deciding.** "Counter ticks
+up" / "numbers count up" / "counter animation on the balance" appears in
+4 of your 10 templates (Fitness XP, Finance balance, E-commerce badge,
+Education XP) — recurring enough that I don't think it should be quietly
+adapted away four separate times. Nothing in the engine animates a number
+today. Two paths:
+  - **Build it** (recommended): a small new optional field on `SlideBase`,
+    e.g. `counter?: { from: number; to: number; prefix?: string; suffix?:
+    string; x: number; y: number; fontPx?: number }`, drawn by one new
+    function alongside where badges/callouts already draw. Real, reusable,
+    ~a session of work including the render code + wiring.
+  - **Adapt away**: each "counter" beat becomes a static before/after
+    number baked into the procedural screenshot art instead of a live
+    animated overlay (e.g. the balance screenshot just shows the settled
+    number; the "ticking up" motion is dropped, not simulated).
 
-## 2. Streak — fitness / habit tracker
+  **I need your call on this one before Batch 1** (Fitness, Food
+  delivery, Finance all touch it, and Finance's whole slide 2 beat is
+  built around the counter). Everything else below I'm confident enough
+  to proceed on directly.
 
-**Pitch:** energetic, stat-forward, built around a streak-celebration
-moment (this is close to what `buildDemoProject()`'s sample already shows —
-formalizing it as a real template rather than only a dev fixture).
+## 2. Genuine gaps — adapted, with the reasoning
 
-- Format: 9:16. Device: `notch`, `midnight`.
-- Colors: cobalt/blue preset (existing PRESETS[0], already tuned).
-- Structure: intro → image slide (today's habits) → image slide (weekly
-  stats) → image slide (streak celebration, `layout: fan` for a 3-device
-  spread) → outro.
-- Text anim: `rise`. Transition: `wipe`. Highlight: `color`.
-- Effect: `confetti` on the streak slide. Camera: `shake` (handheld, "big
-  moment") on the streak slide only, `none` elsewhere — per
-  docs guidance elsewhere in this app, motion should be earned, not
-  constant.
+Everything else in your spec maps cleanly. These four don't, one-for-one:
 
-## 3. Checkout — e-commerce / shopping
+| Your beat | Template | Why it doesn't map | Adaptation |
+|---|---|---|---|
+| "double-tap gesture" | Social #5, slide 3 | `Gesture` (image slides) is `none\|tap\|swipeUp\|swipeLeft`; story actions have `tap`/`longPress` but no double-tap. No distinct double-tap anywhere in the type system. | Single `tap` gesture. Combined with the heart-sticker burst on the same beat, it still reads as "liked" — the visual payoff doesn't depend on the tap literally being doubled. |
+| "hearts particle burst" | Social #5, slide 3 | `Effect` is `none\|confetti\|sparkles\|stickers` — no dedicated physics-particle "hearts" type (that was an Engine v2 concept, gone with that branch). | `effect: 'stickers'` with `stickers: '❤️💕💖✨💗'` — the sticker system already takes arbitrary emoji, so this is a direct, no-compromise substitution, not a downgrade. |
+| "plane sprite flying along a path" | Travel #8, slide 4 | `BuiltInSprite` is `scooter\|car\|bike\|pin\|bell\|heart\|cart\|pizza-box` — no plane. (Scooter *is* built in, so Food delivery's sprite beat is a direct match, no adaptation needed there.) | A custom asset-based sprite (`SpriteSource: {kind:'asset', assetId}`) using a small procedurally-drawn plane icon, same path-following/rotate-along-path behavior as a built-in one — visually identical outcome, just not from the built-in enum. |
+| "shine sweep" | E-commerce #6, ending | No dedicated gloss-sweep effect; `Effect` enum doesn't cover outro treatments at all (effects attach to slides, not the ending card). | Default to `sparkles` on the ending card unless you'd rather I build a real one-off diagonal shine-sweep overlay for just this outro — small, contained, your call, not blocking Batch 1 since E-commerce is Batch 2. |
 
-**Pitch:** a real add-to-cart → pay → confirmation flow, told as one
-continuous **story slide** rather than static screenshots — shows off the
-story format's actual strength (a believable, continuous interaction).
+Two more are worth a one-line clarification, not a change:
 
-- Format: 9:16. Device: `punch`, `graphite`.
-- Colors: warm coral/orange preset (`#FF7A59` → `#7A2BFF`, distinct from
-  templates 1-2).
-- Structure: intro → one story slide (`showScreen` cart → `tap` on Pay →
-  `loading` → `successCheck` → `notification` "Order confirmed") → outro.
-- Text anim: `slide`. Transition: `iris`. Highlight: `underline`.
-- No confetti/effect on the story slide itself (the `successCheck` action
-  already reads as the payoff); intro/outro keep the rest of the
-  template's usual polish.
+- **"tap with auto-zoom" (Fitness story slide 2):** achievable via a
+  manual `CameraKey` anchored to the tap action's `actionId` with
+  `zoom > 1` — but it's authored explicitly per-action, not an automatic
+  side-effect of every tap. Same outcome, just naming it correctly so it's
+  clear I'm hand-placing the zoom keyframe, not flipping a flag.
+- **"toggle that switches on" (SaaS #10, optional slide):** no toggle
+  widget in the engine's vocabulary. Baked into the procedural screenshot
+  art itself (before/after toggle state) paired with `gesture: 'tap'` —
+  the screenshot does the state change, the gesture overlay sells the
+  interaction.
 
-## 4. Clarity — productivity / notes
+Everything else — `showScreen` transitions (push/modal), `loading`
+styles (skeleton), `scroll`, `typeText`, `iconAnim` (bell ring, staggered
+checkmarks via `builtIn: 'check'`), `successCheck`, cutouts (`liftOut` =
+your "lift the card out" beats, multiple cutouts per slide for the
+Reactions-pattern bubble stack), per-slide device/color overrides
+(`SlideStyle.model`/`fcolor`, used for Productivity's browser-then-phone
+and SaaS's browser-then-phone) — all map directly to existing types, no
+adaptation needed.
 
-**Pitch:** calm, minimal, the "quiet confidence" register — deliberately
-the lowest-energy template in the pack, for apps where hype would read
-wrong (note-taking, journaling, focus timers).
+## 3. Coverage guarantee — filling the gaps your spec leaves open
 
-- Format: 9:16 and 1:1 both suit this one well (1:1 note: not required by
-  the gallery brief, mentioning only as a template-design observation).
-- Device: `card` (no frame — content-forward, not device-forward).
-  Colors: paper preset (existing PRESETS[4], warm off-white).
-- Structure: intro (understated, no confetti/stickers anywhere in this
-  template) → 3 image slides (empty state → mid-use → organized result) →
-  outro.
-- Text anim: `type` (typewriter — reads as "written," on-brand for a notes
-  app). Transition: `none` (hard cuts, unhurried). Highlight: `underline`.
-- Camera: `drift` throughout (the one continuous-motion exception
-  MOTION_GUIDE-style guidance calls out — a slow, ambient drift instead of
-  a punchy push).
+Your spec explicitly names a device for every template but a frame
+*color* for only one (Finance: Titanium) and doesn't name specific text-
+anim/transition/highlight/effect/camera enum values (written in prose —
+"letter-drop animation", "camera push" — which I need to map to actual
+enum values regardless). That's deliberate room to fill for full coverage
+without touching anything you specified explicitly.
 
-## 5. Delivery — food / delivery
+**Devices** — your 10 templates use `punch` (Fitness, Education), `island`
+(Food delivery, Meal planning, Finance, Social, E-commerce, Travel, +
+Productivity/SaaS's phone half), and `browser` (Productivity, SaaS).
+`notch`, `tablet`, and `card` never appear. Proposed fills, none
+conflicting with your spec (which only names "Island phone" generically
+for these three): **Meal planning → `notch`** (its slot list has no
+device-frame significance either way), **Travel → `tablet`** (a
+travel-booking app plausibly runs on a tablet, and pairs naturally with
+your spec's own `browser`-adjacent framing for this one), **Productivity's
+phone half → `card`** (frameless reads as "clean tool," fits the Sleek
+motion style you gave it, and is otherwise unused).
 
-**Pitch:** appetite-appeal, fast pacing, built around anticipation (a
-delivery countdown) resolving into arrival.
+**Frame colors** — only Titanium is pinned (Finance). Proposed: Fitness
+`graphite`, Food delivery `rose`, Meal planning `silver`, Social `theme`
+(ties to Grape's accent), E-commerce `midnight`, Productivity `graphite`
+(reused — six colors, ten templates, one repeat is unavoidable and
+Productivity/Fitness don't sit near each other in the gallery), Travel
+`titanium` (reused, deliberately — pairs with Finance as the pack's two
+"serious" templates), Education `rose`, SaaS `silver`. All six frame
+colors now appear at least once (graphite, silver, titanium, midnight,
+rose, theme).
 
-- Format: 9:16. Device: `notch`, `rose` frame color (warm, food-adjacent
-  without being literally red).
-- Colors: sherbet preset (existing PRESETS[1], coral/pink).
-- Structure: intro → image slide (browse menu) → image slide (order
-  tracking / live map) → image slide (arrived, receipt) → outro.
-- Text anim: `letters`. Transition: `bars`. Highlight: `marker`.
-- Gesture: `swipeUp` on the browse slide (menu scroll). Camera: `pull` on
-  the tracking slide (map "zooming out" feel).
+**Text animations / transitions / highlight styles / effects / camera
+moves** — mapped from your prose per-template in the tables below (§4).
+Tallied across all 10: all 5 text anims, all 5 transitions, all 3
+highlight styles, and all 4 effects (none/confetti/sparkles/stickers) are
+used; camera moves push/pull/drift/shake all appear (Fitness push,
+Food-delivery pull, Meal-planning/Travel drift, Fitness+Social+Education
+shake), `none` is the default everywhere else per your "never two slides
+in a row with the same motion" rule.
 
-## 6. Ledger — finance / budgeting
+## 4. New color presets
 
-**Pitch:** trustworthy, precise, chart-forward — the template that has to
-look credible, not just attractive.
+Your spec names four palettes that don't exist in `PRESETS`
+(`src/engine/constants.ts`) yet — Sunset, Midnight, Candy, Aurora (Mint,
+Paper, Grape, Cobalt, Night all already exist and are reused as named).
+Proposed hex values, appended to `PRESETS` (pure addition, doesn't touch
+any existing entry):
 
-- Format: 9:16. Device: `tablet`, `titanium` (the one template that
-  deliberately uses the tablet frame — a budgeting/finance app is
-  plausible on a larger screen, and it's otherwise untested in the pack).
-- Colors: night preset (existing PRESETS[3], dark slate + cyan accent —
-  reads as serious/technical, distinct from the warmer templates above).
-- Structure: intro → image slide (balance overview) → image slide
-  (spending chart) → image slide (goal progress) → outro.
-- Text anim: `rise`. Transition: `wipe`. Highlight: `color`.
-- No effects (confetti/stickers would undercut the "trustworthy" register).
-  Camera: `none` — static, deliberate, nothing playful.
+| Name | a → b | text | accent | Used by |
+|---|---|---|---|---|
+| Sunset | `#FF7A59` → `#7A2BFF` | `#FFFFFF` | `#FFE066` | Food delivery |
+| Midnight | `#0F1B3D` → `#050912` | `#F3F4FF` | `#7CF0FF` | Finance (distinct from the existing "Night" preset — Night leans slate/cyan, Midnight leans deep indigo/navy, and both appear in your spec on different templates, so they need to actually be different) |
+| Candy | `#FFE3EC` → `#FF6FB0` | `#2A1030` | `#FF3E7F` | E-commerce |
+| Aurora | `#3EC5FF` → `#8B5CF6` | `#FFFFFF` | `#FFE066` | Travel |
 
-## 7. Horizon — travel / booking
+## 5. Screenshot assets
 
-**Pitch:** aspirational, photography-forward, the template most worth
-checking in **16:9** specifically (landscape suits travel photography, and
-this is a real test of the format beyond "does it technically render").
+Every slot gets a dedicated procedural generator (canvas-drawn, in the
+style of `src/dev/sampleProject.ts`'s `makeSample()` but purpose-built per
+slot rather than 3 generic kinds reused everywhere) — invented app names,
+invented data, real type hierarchy/spacing/icons/color, no placeholder-
+grey boxes. ~40 distinct screens across the 10 templates. Real-site
+captures (Wikipedia/Hacker News/etc. from Phase 3 QA) stay dev-only, never
+referenced by anything under `src/engine/templates/` or shipped in the
+gallery. For the "light and dark app screenshots" verification pass, each
+template's primary slot generator takes a `theme: 'light' | 'dark'`
+parameter so the same layout can render both ways for the check, without
+doubling every slot's art.
 
-- Format: 16:9 primary, 9:16 secondary. Device: `browser` for the 16:9 cut
-  (a travel-booking site, not just an app) — another frame otherwise
-  untested in the pack.
-- Colors: grape preset (existing PRESETS[5], purple/violet, evokes
-  dusk/aspirational travel photography without needing real photos).
-- Structure: intro → image slide (destination browse) → image slide
-  (booking flow) → image slide (confirmation) → outro.
-- Text anim: `slide`. Transition: `flash`. Highlight: `marker`.
-- Camera: `drift` (slow pan, travel-brochure feel).
+## 6. Your spec, verbatim
 
-## 8. Frequency — music / streaming
-
-**Pitch:** dark, neon, high-energy — the "youth/entertainment app" register,
-deliberately the most saturated-color template in the pack.
-
-- Format: 9:16. Device: `island`, `midnight`.
-- Colors: a new dark-neon preset (`#0E1015` → `#141822`, accent `#7CF0FF`
-  cyan — distinct from Ledger's night preset by leaning fully black/neon
-  rather than slate).
-- Structure: intro → image slide (now-playing) → image slide (playlist/
-  discovery) → text slide (kinetic lyric-style callout) → outro.
-- Text anim: `pop`. Transition: `bars`. Highlight: `color`.
-- Effect: `sparkles` on the now-playing slide. Camera: `push` on the
-  kinetic text slide.
-
-## 9. Spark — dating / social matching
-
-**Pitch:** warm, playful, built around a match/connection moment — the
-template most similar to Reactions (#1) in energy, deliberately
-differentiated by color and by using `swipeLeft` (a gesture no other
-template in the pack uses).
-
-- Format: 9:16. Device: `notch`, `rose`.
-- Colors: a new warm pink/violet preset (`#FF6FD8` → `#8B5CF6` — shares a
-  stop with Reactions' preset but inverted direction and a different
-  second color, keeping the two visually related but not identical, which
-  is appropriate since they're adjacent categories).
-- Structure: intro → image slide (browse/swipe) → image slide (match
-  moment) → outro.
-- Text anim: `pop`. Transition: `iris`. Highlight: `marker`.
-- Gesture: `swipeLeft` on the browse slide. Effect: `confetti` on the match
-  slide. Camera: `shake` on the match slide only (mirrors Streak's "earn
-  the motion" approach).
-
-## 10. Arcade — gaming / entertainment
-
-**Pitch:** the loudest, most maximalist template in the pack, intentionally
-— the pack needs one template that goes all-in on effects/motion so the
-gallery shows the engine's full range, not just its restrained end.
-
-- Format: 9:16. Device: `punch`, `silver`.
-- Colors: a new high-saturation preset (`#FFD23F` → `#FF3E7F`, yellow to
-  hot pink — the brightest preset in the pack by design).
-- Structure: intro → image slide (gameplay) → image slide (level-up /
-  achievement) → text slide (score callout) → outro.
-- Text anim: `letters`. Transition: `bars`. Highlight: `color`.
-- Effect: `confetti` **and** `stickers` split across two slides (not
-  simultaneously — even the maximalist template shouldn't stack every
-  effect on one frame). Camera: `shake` on the achievement slide.
+Everything below is exactly what you sent — the ten templates, in order,
+as the base. §§1-5 above are the only changes; nothing here was edited.
 
 ---
 
-## Coverage check
+### Rules for every template
 
-Every device frame, every frame color, all 5 text animations, all 5
-transitions, all 3 highlight styles, 4 of 5 background patterns (grid
-unused — candidate to swap into one template if you want full pattern
-coverage too, flag if so), all 4 effects, and `push`/`pull`/`drift`/`shake`
-camera moves each appear at least once; `none` camera is the default
-elsewhere. One story-slide template (#3) exercises that format
-specifically since it's structurally different enough that every template
-using it would be redundant. Six of ten reuse an existing `PRESETS` color
-entry (keeps the palette count sane); four introduce a new preset each,
-which — if approved — means adding 4 entries to `PRESETS` in
-`src/engine/constants.ts`.
+- Format: authored in 9:16, must re-lay out correctly in 1:1 and 16:9.
+- Length: 15–22 seconds. Each has a "short cut" variant at 8–10 seconds
+  (drop the slides marked optional).
+- Screenshot slots: every template declares named slots with guidance
+  text, e.g. home (tall), detail, success. The upload wizard asks for
+  them in order.
+- Copy: placeholder headlines are written in the product's voice with
+  `*stars*` highlighting. Keep them under 6 words.
+- Sound: default SFX per action; suggested music mood listed per
+  template.
+- Beat rhythm: a hero moment every 3–4 seconds. Never two slides in a row
+  with the same motion.
+- Localization: all copy lives in a strings map so a template can be
+  translated without touching the timeline.
+
+### 1. Fitness & workout tracking
+
+Slots: `today` (tall), `workout-detail`, `progress-chart`,
+`streak-success` · Palette: Mint · Motion style: Bold · Device: Android
+(`punch`, `graphite`) · Music: driving, 120–128 bpm
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Intro | App icon, "Train like you mean it" |
+| 2 | Story | `launchApp` → `loading` (skeleton) → scroll `today` → tap "Start workout" with auto-zoom → `showScreen workout-detail` (push) |
+| 3 | Screenshot + gesture | `workout-detail`, headline "Every set, counted", swipe-up gesture, callout "Log a set in one tap" |
+| 4 | Screenshot + spotlight | `progress-chart`, headline "Watch yourself get stronger", zoom to the chart, camera push |
+| 5 | Text slide *(optional)* | "No guesswork. Just progress." Letter-drop animation, own theme (Night), flash transition |
+| 6 | Screenshot + effect | `streak-success`, pop-in, confetti burst, badge "30-day streak", camera shake |
+| 7 | Ending | "Start your first workout" + store line |
+
+### 2. Food delivery & restaurant ordering
+
+Slots: `menu` (tall), `dish-detail`, `cart`, `tracking-map` · Palette:
+Sunset · Motion style: Playful · Device: Island phone (`island`, `rose`)
+· Music: warm, upbeat
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Intro | "Dinner, sorted" |
+| 2 | Story | `launchApp` → scroll `menu` slowly → tap a dish (auto-zoom) → `showScreen dish-detail` (modal) → tap "Add to cart" → notification "Added" |
+| 3 | Screenshot + stickers | `cart`, headline "Checkout in one tap", emoji stickers 🍕🔥⭐, callout "Apple Pay & cards" |
+| 4 | Story | `tracking-map`: sprite (scooter) drives along a path to a house pin → `iconAnim` bell ring → notification "Your order has arrived" |
+| 5 | Text slide *(optional)* | "Hot in 20 minutes." |
+| 6 | Ending | "Order in 60 seconds" |
+
+### 3. Meal planning & recipes
+
+Slots: `recipe-feed` (tall), `recipe-detail`, `shopping-list`,
+`week-plan` · Palette: Paper · Motion style: Calm · Device: Island phone
+(`notch`, `silver`) · Music: soft acoustic
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Intro | "What's for dinner?" |
+| 2 | Screenshot + scroll | `recipe-feed` with scroll-through-tall-screenshot, headline "Recipes you'll actually cook" |
+| 3 | Screenshot + cutout | `recipe-detail`: lift the ingredients card out of the screen, headline "Every step, clear" |
+| 4 | Story | tap "Add to list" → `showScreen shopping-list` → items check themselves off one by one (staggered `iconAnim`) |
+| 5 | Screenshot + spotlight *(optional)* | `week-plan`, zoom to a day, callout "Plan the whole week" |
+| 6 | Ending | "Plan this week's meals" |
+
+### 4. Finance, banking & budgeting
+
+Slots: `balance-home`, `transactions` (tall), `insights-chart`,
+`transfer-success` · Palette: Midnight · Motion style: Sleek · Device:
+Island phone, Titanium (`island`, `titanium`) · Music: minimal, clean
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Intro | "Money, made calm" |
+| 2 | Screenshot + rise | `balance-home`, headline "Your money, at a glance", counter animation on the balance |
+| 3 | Screenshot + scroll | `transactions`, scroll, callout "Categorized automatically" |
+| 4 | Screenshot + spotlight | `insights-chart`, zoom to the chart, headline "See where it actually goes" |
+| 5 | Story | tap "Send" → loading spinner → `transfer-success` with checkmark draw-on → "Sent in 2 seconds" |
+| 6 | Ending | "Open an account free" — no confetti here; keep finance restrained |
+
+### 5. Social, community & chat
+
+Slots: `feed` (tall), `post-detail`, `chat`, `profile` · Palette: Grape ·
+Motion style: Playful · Device: Island phone (`island`, `theme`) · Music:
+bright pop
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Intro | "Your people, in one place" |
+| 2 | Screenshot + scroll | `feed`, scroll, headline "A feed that's actually yours" |
+| 3 | Screenshot + cutout | `post-detail`: lift the post card out, double-tap gesture, hearts particle burst, counter ticks up |
+| 4 | Screenshot + cutout | `chat`: three message bubbles lift out one by one with parallax (the Reactions pattern) |
+| 5 | Text slide *(optional)* | "Say more with reactions" |
+| 6 | Ending | "Join free" + badge "New" |
+
+### 6. E-commerce & retail
+
+Slots: `shop-home` (tall), `product`, `cart`, `order-confirmed` ·
+Palette: Candy · Motion style: Bold · Device: Island phone (`island`,
+`midnight`) · Music: confident, punchy
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Intro | Brand name + tagline |
+| 2 | Screenshot + slide-across | `shop-home`, headline "Shop the drop" |
+| 3 | Screenshot + cutout | `product`: lift the product card out, rotate slightly, stickers "Free returns" and "⭐ 4.9" |
+| 4 | Story | tap "Add to bag" → badge counter bumps → `showScreen cart` → tap "Checkout" → `order-confirmed` with checkmark |
+| 5 | Screenshot + fan *(optional)* | Three products fanned in a stack of devices |
+| 6 | Ending | "Shop now" with a shine sweep |
+
+### 7. Productivity, tasks & notes
+
+Slots: `task-list` (tall), `task-detail`, `calendar`, `done-state` ·
+Palette: Cobalt · Motion style: Sleek · Device: Browser + phone mix
+(`browser` / `card`, `graphite`) · Music: focused, minimal
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Text slide | "Your day, under control" — opens on text, not the app |
+| 2 | Screenshot + rise | `task-list`, tap gesture on a checkbox, item checks off, callout "One tap to complete" |
+| 3 | Screenshot + spotlight | `task-detail`, zoom to due-date field, type-text action showing text being entered |
+| 4 | Screenshot | `calendar`, browser frame, headline "Works on every device" |
+| 5 | Screenshot + effect *(optional)* | `done-state`, sparkles, "Inbox zero, finally" |
+| 6 | Ending | "Get started free" |
+
+### 8. Travel & booking
+
+Slots: `search`, `results` (tall), `hotel-detail`, `booking-confirmed`,
+`map` · Palette: Aurora · Motion style: Calm · Device: Island phone
+(`tablet`, `titanium`) · Music: airy, cinematic
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Intro | "Go somewhere" |
+| 2 | Story | `search`: type-text "Lisbon" → `results` appear → scroll results |
+| 3 | Screenshot + cutout | `hotel-detail`: lift the photo card out with a slow camera push, headline "Stays you'll remember" |
+| 4 | Story | tap "Book" → loading → `booking-confirmed` checkmark → `map` with a plane sprite flying along a path |
+| 5 | Text slide *(optional)* | "Booked in 90 seconds" |
+| 6 | Ending | "Find your next trip" |
+
+### 9. Education & language learning
+
+Slots: `lesson-list` (tall), `exercise`, `correct-answer`, `streak` ·
+Palette: Mint · Motion style: Playful · Device: Android (`punch`, `rose`)
+· Music: cheerful, light
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Intro | "10 minutes a day" |
+| 2 | Screenshot + scroll | `lesson-list`, headline "Learn in small bites" |
+| 3 | Story | `exercise`: tap an answer → highlight → `correct-answer` with a checkmark and a sparkle burst |
+| 4 | Screenshot + effect | `streak`, confetti, badge "7 days", counter animation on XP |
+| 5 | Text slide *(optional)* | "Habits beat cramming" |
+| 6 | Ending | "Start your first lesson" |
+
+### 10. SaaS & web app (browser frame)
+
+Slots: `dashboard`, `detail-view`, `settings`, `mobile-companion` ·
+Palette: Night · Motion style: Sleek · Device: Browser, then phone
+(`browser` / `island`, `silver`) · Music: modern, restrained
+
+| # | Slide | Content |
+|---|---|---|
+| 1 | Text slide | "Ship faster. Guess less." |
+| 2 | Screenshot + rise | `dashboard` in a browser frame, camera slow push-in, callout on the key metric |
+| 3 | Screenshot + cutout | `detail-view`: lift a chart card out, numbers count up |
+| 4 | Screenshot + gesture *(optional)* | `settings`, tap a toggle that switches on |
+| 5 | Screenshot | `mobile-companion` on a phone beside the browser, "And in your pocket" |
+| 6 | Ending | "Try it free for 14 days" |
+
+### Delivery checklist
+
+For each template:
+
+- A preview video (10s loop, 1080×1920 and 1920×1080) rendered from
+  placeholder screenshots, for the gallery and the landing page.
+- Placeholder screenshots generated in code so the template plays before
+  any upload.
+- A gallery entry: name, industry, duration, slot count, live animated
+  preview.
+- A working short-cut variant.
+- A check that it renders correctly in all three formats, in light and
+  dark app screenshots, and with 2 slots left empty.
+
+---
+
+## 7. Build order
+
+Batch 1 (Fitness, Food delivery, Finance) → review → Batch 2 (Social,
+E-commerce, Productivity, SaaS) → review → Batch 3 (Meal planning,
+Travel, Education) → review, exactly as you specified. I'll wait for the
+counter-overlay call (§1d) before starting Batch 1, since Fitness and
+Finance both use it in a core (non-optional) beat.
