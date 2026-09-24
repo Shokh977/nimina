@@ -174,7 +174,15 @@ export function drawDevice(
 
   ctx.fillStyle = '#000';
   if (m.cut === 'island') {
-    rr(ctx, -PW * 0.15, sb.y + PW * 0.035, PW * 0.3, PW * 0.085, PW * 0.0425);
+    // Deliberate deviation from legacy/promo-studio.html (confirmed
+    // byte-identical there: `sb.y + PW*0.035`, height `PW*0.085`) — that
+    // positioning put the pill's bottom edge ~0.12*PW below the screen
+    // top, well past the status bar and into real screenshot content
+    // (covering 1-2 lines of a real header, confirmed visually against
+    // captured live screenshots). Pulled up to sit near sb.y like
+    // notch/punch already do, and shortened so its extent (~0.07*PW below
+    // sb.y) matches theirs instead of overlapping app content.
+    rr(ctx, -PW * 0.15, sb.y + PW * 0.005, PW * 0.3, PW * 0.065, PW * 0.0325);
     ctx.fill();
   } else if (m.cut === 'notch') {
     const nw = PW * 0.5,
