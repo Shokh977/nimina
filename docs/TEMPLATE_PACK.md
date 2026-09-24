@@ -57,37 +57,60 @@ English. Translating a template means passing a different `Strings`
 object in; the scene list itself never changes. Pure authoring
 convention, no engine changes.
 
-**d. Numeric counter overlay — flagging, not deciding.** "Counter ticks
-up" / "numbers count up" / "counter animation on the balance" appears in
-4 of your 10 templates (Fitness XP, Finance balance, E-commerce badge,
-Education XP) — recurring enough that I don't think it should be quietly
-adapted away four separate times. Nothing in the engine animates a number
-today. Two paths:
-  - **Build it** (recommended): a small new optional field on `SlideBase`,
-    e.g. `counter?: { from: number; to: number; prefix?: string; suffix?:
-    string; x: number; y: number; fontPx?: number }`, drawn by one new
-    function alongside where badges/callouts already draw. Real, reusable,
-    ~a session of work including the render code + wiring.
-  - **Adapt away**: each "counter" beat becomes a static before/after
-    number baked into the procedural screenshot art instead of a live
-    animated overlay (e.g. the balance screenshot just shows the settled
-    number; the "ticking up" motion is dropped, not simulated).
+**d. Numeric counter overlay — built.** Correcting my own earlier count:
+re-checked the spec directly — it's **Finance** (balance), **Social**
+(likes), **SaaS** (detail-view numbers), and **Education** (XP), not
+Fitness (Fitness has no counter beat; I'd misattributed one to it). Four,
+matching your count. E-commerce's "badge counter bumps" is different —
+the existing `badge` field already supports a string appearing with its
+own pop-in animation, so a bag-count badge going from empty to "1" on the
+add-to-bag beat needs no new feature, just correct timing against the
+story's tap action.
 
-  **I need your call on this one before Batch 1** (Fitness, Food
-  delivery, Finance all touch it, and Finance's whole slide 2 beat is
-  built around the counter). Everything else below I'm confident enough
-  to proceed on directly.
+Built as `CounterConfig` (`src/engine/types.ts`) — a new
+`counter: CounterConfig | null` field on every slide (image and text,
+`null` = off, same convention as `iconAssetId`): `from`/`to`, `format`
+(`'integer' | 'currency' | 'percent'`, with `currencySymbol` for currency
+and configurable decimal places, thousands separators always on), `at`/
+`duration` (seconds within the slide, same convention as a cutout's `at`),
+`easing` (reuses the existing `EasingName` union and
+`story/easing.ts`'s `resolveEasing` — no parallel easing system), and
+`x`/`y` (normalized position, resolved the same way callout/gesture
+targets are). Progress clamps to exactly 1 once `at + duration` has
+passed; every named easing function returns exactly 1 at input 1 (checked
+directly against each formula, not assumed) — the number lands exactly on
+`to` and stays there, never one frame short. Rendered in `devices.ts`
+(`formatCounterValue`, `counterValueAt`, `drawCounter`) alongside
+`drawBadge`/`drawCallout`, wired into `slides.ts` the same way callout is.
+
+Exposed in the editor too — `SceneCard.tsx` gets a "Counter" section
+(collapsible, matching Cutouts) with a toggle plus from/to/format/symbol/
+decimals/duration/start-time/easing fields and numeric X/Y position
+inputs. (Position is plain numeric entry rather than a second draggable
+marker on the thumbnail, to avoid overlapping the existing focus-point
+picker — a real, complete control, just not drag-to-place yet.) Verified
+directly: rendered a live counter (`$0.00 → $1,204.50`, ease-out, 1.5s)
+in the classic demo project, confirmed smooth mid-animation interpolation,
+invisible before its start time, and an exact `$1,204.50` at and after
+completion — `npx tsc --noEmit`, `npx eslint --max-warnings 0`, `npm run
+build`, and `npm run visual-regression` all pass with the change in.
+
+**Shine sweep — resolved per your rule.** You asked me to build it if
+"similarly contained and reused," adapt if "a one-template flourish." It
+only appears once (E-commerce's ending) and nothing else in the pack
+reuses it — one-template flourish. **Adapting to `sparkles`**, not
+building a dedicated effect.
 
 ## 2. Genuine gaps — adapted, with the reasoning
 
-Everything else in your spec maps cleanly. These four don't, one-for-one:
+Everything else in your spec maps cleanly. These three don't, one-for-one
+(shine sweep, the fourth, is resolved in §1d above):
 
 | Your beat | Template | Why it doesn't map | Adaptation |
 |---|---|---|---|
 | "double-tap gesture" | Social #5, slide 3 | `Gesture` (image slides) is `none\|tap\|swipeUp\|swipeLeft`; story actions have `tap`/`longPress` but no double-tap. No distinct double-tap anywhere in the type system. | Single `tap` gesture. Combined with the heart-sticker burst on the same beat, it still reads as "liked" — the visual payoff doesn't depend on the tap literally being doubled. |
 | "hearts particle burst" | Social #5, slide 3 | `Effect` is `none\|confetti\|sparkles\|stickers` — no dedicated physics-particle "hearts" type (that was an Engine v2 concept, gone with that branch). | `effect: 'stickers'` with `stickers: '❤️💕💖✨💗'` — the sticker system already takes arbitrary emoji, so this is a direct, no-compromise substitution, not a downgrade. |
 | "plane sprite flying along a path" | Travel #8, slide 4 | `BuiltInSprite` is `scooter\|car\|bike\|pin\|bell\|heart\|cart\|pizza-box` — no plane. (Scooter *is* built in, so Food delivery's sprite beat is a direct match, no adaptation needed there.) | A custom asset-based sprite (`SpriteSource: {kind:'asset', assetId}`) using a small procedurally-drawn plane icon, same path-following/rotate-along-path behavior as a built-in one — visually identical outcome, just not from the built-in enum. |
-| "shine sweep" | E-commerce #6, ending | No dedicated gloss-sweep effect; `Effect` enum doesn't cover outro treatments at all (effects attach to slides, not the ending card). | Default to `sparkles` on the ending card unless you'd rather I build a real one-off diagonal shine-sweep overlay for just this outro — small, contained, your call, not blocking Batch 1 since E-commerce is Batch 2. |
 
 Two more are worth a one-line clarification, not a change:
 
@@ -375,6 +398,6 @@ For each template:
 
 Batch 1 (Fitness, Food delivery, Finance) → review → Batch 2 (Social,
 E-commerce, Productivity, SaaS) → review → Batch 3 (Meal planning,
-Travel, Education) → review, exactly as you specified. I'll wait for the
-counter-overlay call (§1d) before starting Batch 1, since Fitness and
-Finance both use it in a core (non-optional) beat.
+Travel, Education) → review, exactly as you specified. Counter overlay
+and shine-sweep are both resolved (§1d) and the feature is built and
+verified — starting Batch 1 now.
