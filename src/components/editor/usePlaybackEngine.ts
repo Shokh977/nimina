@@ -1,0 +1,242 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { getSfxEvents, playSfx, scheduleDucking, type SfxEvent } from '@/engine/audio';
+import { FORMATS } from '@/engine/constants';
+import { getTimeline, render } from '@/engine/render';
+import { useEditorStore } from '@/store/editorStore';
+
+export interface PlaybackEngine {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  playing: boolean;
+  displayT: number;
+  total: number;
+  togglePlay: () => void;
+  seek: (t: number) => void;
+  playFrom: (t: number) => void;
+}
+
+/**
+ * Owns the preview canvas's render loop: reads `project`/`assets` from the
+ * store, drives the engine's `render()` every animation frame, and exposes
+ * play/pause/seek. Also owns live preview audio (background music + story
+ * action sound effects, ducked and scheduled from src/engine/audio/) — kept
+ * in the same hook as the visual loop because audio scheduling needs to
+ * react to exactly the same play/pause/seek transitions the canvas loop
+ * already tracks via tRef/playingRef. Kept out of the Zustand store on
+ * purpose — playback time is ephemeral UI state, not part of the
+ * serializable Project.
+ */
+export function usePlaybackEngine(): PlaybackEngine {
+  const project = useEditorStore((s) => s.project);
+  const assets = useEditorStore((s) => s.assets);
+  const plan = useEditorStore((s) => s.plan);
+
+  // Mirrors of the latest store values for the rAF loop to read, so the
+  // loop effect below can have an empty dependency array (run once) instead
+  // of tearing down/restarting on every keystroke-driven project update.
+  const projectRef = useRef(project);
+  const assetsRef = useRef(assets);
+  const planRef = useRef(plan);
+  useEffect(() => {
+    projectRef.current = project;
+    assetsRef.current = assets;
+    planRef.current = plan;
+  }, [project, assets, plan]);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const tRef = useRef(0);
+  const playingRef = useRef(false);
+  const lastRef = useRef(0);
+  const rafRef = useRef(0);
+  const scaleRef = useRef(0.5);
+
+  const [playing, setPlaying] = useState(false);
+  const [displayT, setDisplayT] = useState(0);
+
+  const total = getTimeline(project).total;
+
+  /* ---------- live preview audio ---------- */
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const musicGainRef = useRef<GainNode | null>(null);
+  const sfxGainRef = useRef<GainNode | null>(null);
+  const musicSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const scheduledAtProjectTRef = useRef(0);
+  const lastRestartWallRef = useRef(0);
+
+  const ensureAudioGraph = useCallback((): AudioContext => {
+    if (audioCtxRef.current) {
+      void audioCtxRef.current.resume();
+      return audioCtxRef.current;
+    }
+    const ctx = new AudioContext();
+    const master = ctx.createGain();
+    master.gain.value = 1;
+    const music = ctx.createGain();
+    const sfx = ctx.createGain();
+    sfx.gain.value = 0.9;
+    music.connect(master);
+    sfx.connect(master);
+    audioCtxRef.current = ctx;
+    masterGainRef.current = master;
+    musicGainRef.current = music;
+    sfxGainRef.current = sfx;
+    return ctx;
+  }, []);
+
+  /** (Re)schedules music + every upcoming SFX event from project-time `t`
+   * onward, replacing whatever was previously scheduled. Safe to call
+   * repeatedly (on play, and again on a mid-playback seek). */
+  const startAudioFrom = useCallback((t: number) => {
+    const ctx = ensureAudioGraph();
+    const music = musicGainRef.current!;
+    const sfx = sfxGainRef.current!;
+    const master = masterGainRef.current!;
+    master.disconnect();
+    master.connect(ctx.destination);
+
+    try {
+      musicSourceRef.current?.stop();
+    } catch {
+      // already stopped
+    }
+    musicSourceRef.current = null;
+    music.gain.cancelScheduledValues(ctx.currentTime);
+    sfx.gain.cancelScheduledValues(ctx.currentTime);
+
+    const proj = projectRef.current;
+    const dur = getTimeline(proj).total;
+    const events: SfxEvent[] = getSfxEvents(proj).filter((e) => e.time >= t);
+
+    const musicBuffer = proj.music ? (assetsRef.current.audio[proj.music.assetId] ?? null) : null;
+    if (musicBuffer && musicBuffer.duration > 0) {
+      const src = ctx.createBufferSource();
+      src.buffer = musicBuffer;
+      src.loop = true;
+      src.connect(music);
+      const offset = t % musicBuffer.duration;
+      src.start(ctx.currentTime, offset);
+      musicSourceRef.current = src;
+      music.gain.setValueAtTime(proj.volume, ctx.currentTime);
+      if (proj.ducking && events.length) {
+        scheduleDucking(music, (pt) => ctx.currentTime + (pt - t), events, proj.volume, t, dur);
+      }
+    }
+
+    for (const e of events) {
+      if (e.time > dur) continue;
+      playSfx(ctx, sfx, e.id, ctx.currentTime + (e.time - t));
+    }
+
+    scheduledAtProjectTRef.current = t;
+    lastRestartWallRef.current = performance.now();
+  }, [ensureAudioGraph]);
+
+  const stopAudio = useCallback(() => {
+    masterGainRef.current?.disconnect();
+    try {
+      musicSourceRef.current?.stop();
+    } catch {
+      // already stopped
+    }
+    musicSourceRef.current = null;
+  }, []);
+
+  // Stop and release audio on unmount.
+  useEffect(() => stopAudio, [stopAudio]);
+
+  // Resize the backing canvas whenever the output format changes.
+  useEffect(() => {
+    const fmt = FORMATS[project.format];
+    const scale = project.format === '1:1' ? 0.6 : 0.5;
+    scaleRef.current = scale;
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.width = Math.round(fmt.w * scale);
+      canvas.height = Math.round(fmt.h * scale);
+    }
+  }, [project.format]);
+
+  // Keep the playhead in range if the project got shorter (e.g. a slide was
+  // deleted while scrubbed past the new end).
+  useEffect(() => {
+    if (tRef.current > total) {
+      tRef.current = total;
+      setDisplayT(total);
+    }
+  }, [total]);
+
+  useEffect(() => {
+    const loop = (now: number) => {
+      const canvas = canvasRef.current;
+      const proj = projectRef.current;
+      if (canvas) {
+        if (playingRef.current) {
+          const dt = (now - lastRef.current) / 1000;
+          lastRef.current = now;
+          const dur = getTimeline(proj).total;
+          let next = tRef.current + dt;
+          if (next >= dur) {
+            next = dur;
+            playingRef.current = false;
+            setPlaying(false);
+            stopAudio();
+          }
+          // A discontinuity here (bigger than normal playback drift) means
+          // the timeline was dragged mid-playback (Timeline.tsx's scrub
+          // doesn't pause first) — resync audio to the new position,
+          // throttled so a fast drag doesn't restart the graph every frame.
+          const expected = scheduledAtProjectTRef.current + (now - lastRestartWallRef.current) / 1000;
+          if (Math.abs(next - expected) > 0.25 && now - lastRestartWallRef.current > 120) {
+            startAudioFrom(next);
+          }
+          tRef.current = next;
+          setDisplayT(next);
+        }
+        const ctx = canvas.getContext('2d');
+        if (ctx) render(ctx, proj, assetsRef.current.images, tRef.current, scaleRef.current, { watermark: planRef.current === 'free' });
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [startAudioFrom, stopAudio]);
+
+  const seek = useCallback((t: number) => {
+    const dur = getTimeline(projectRef.current).total;
+    tRef.current = Math.min(Math.max(t, 0), dur);
+    setDisplayT(tRef.current);
+  }, []);
+
+  const playFrom = useCallback(
+    (t: number) => {
+      seek(t);
+      lastRef.current = performance.now();
+      playingRef.current = true;
+      setPlaying(true);
+      startAudioFrom(tRef.current);
+    },
+    [seek, startAudioFrom],
+  );
+
+  const togglePlay = useCallback(() => {
+    setPlaying((p) => {
+      const next = !p;
+      if (next) {
+        const dur = getTimeline(projectRef.current).total;
+        if (tRef.current >= dur - 0.01) tRef.current = 0;
+        lastRef.current = performance.now();
+        playingRef.current = next;
+        startAudioFrom(tRef.current);
+      } else {
+        playingRef.current = next;
+        stopAudio();
+      }
+      return next;
+    });
+  }, [startAudioFrom, stopAudio]);
+
+  return { canvasRef, playing, displayT, total, togglePlay, seek, playFrom };
+}

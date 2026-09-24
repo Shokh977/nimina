@@ -1,0 +1,21 @@
+# Config for the Supabase CLI (`supabase` npm package or standalone binary).
+# Used for `supabase link` + `supabase db push` to apply supabase/migrations/
+# to your remote project. See AGENTS.md for the full setup walkthrough.
+project_id = "promo-studio"
+
+[db]
+port = 54322
+major_version = 17
+
+[api]
+enabled = true
+port = 54321
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback"]
