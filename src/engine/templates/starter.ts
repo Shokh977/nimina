@@ -11,26 +11,12 @@
  * (metadata-only) `templates` table that lets an admin enable/reorder
  * these without a deploy; the Project-building logic itself stays in code.
  */
-import { PRESETS } from './constants';
-import { createImageSlide, createTextSlide } from './slides';
-import type { Project } from './types';
+import { PRESETS } from '../constants';
+import { createImageSlide, createTextSlide } from '../slides';
+import type { Project } from '../types';
+import type { TemplateDef, TemplateSlot } from './types';
 
-export interface TemplateSlot {
-  sceneId: number;
-  label: string;
-  hint: string;
-}
-
-export interface TemplateDef {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  /** Card gradient for the template gallery (no rendered preview — keeps
-   * the gallery instant and asset-free). */
-  swatch: [string, string];
-  build: () => { project: Project; slots: TemplateSlot[] };
-}
+export type { TemplateDef, TemplateSlot };
 
 function base(overrides: Partial<Project> = {}): Omit<Project, 'scenes'> {
   return {
@@ -61,13 +47,14 @@ function base(overrides: Partial<Project> = {}): Omit<Project, 'scenes'> {
   };
 }
 
-export const TEMPLATES: TemplateDef[] = [
+export const STARTER_TEMPLATES: TemplateDef[] = [
   {
     id: 'app-launch',
     name: 'App Launch',
     description: 'Punchy, energetic intro for a brand-new app — three screenshots with confident motion.',
     category: 'Launch',
     swatch: ['#3347FF', '#0C1662'],
+    durationSeconds: 17.5,
     build: () => {
       let id = 1;
       const project: Project = {
@@ -78,7 +65,7 @@ export const TEMPLATES: TemplateDef[] = [
           createImageSlide(id++, null, { headline: 'Ready when *you* are', anim: 'slide', dur: 4, badge: 'New' }),
         ],
       };
-      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ sceneId: s.id, label: `Screenshot ${i + 1}`, hint: ['Home / main screen', 'Key feature in action', 'Final screen or results'][i] }));
+      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ key: String(s.id), targets: [{ sceneId: s.id }], label: `Screenshot ${i + 1}`, hint: ['Home / main screen', 'Key feature in action', 'Final screen or results'][i] }));
       return { project, slots };
     },
   },
@@ -88,6 +75,7 @@ export const TEMPLATES: TemplateDef[] = [
     description: 'Calm, focused spotlight on one feature — a statement slide followed by two close-up screenshots.',
     category: 'Feature',
     swatch: ['#2B2F3A', '#0E1015'],
+    durationSeconds: 14,
     build: () => {
       let id = 1;
       const project: Project = {
@@ -98,7 +86,7 @@ export const TEMPLATES: TemplateDef[] = [
           createImageSlide(id++, null, { headline: 'Simple. *Powerful.*', anim: 'rise', dur: 4, callout: 'Tap to try' }),
         ],
       };
-      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ sceneId: s.id, label: `Screenshot ${i + 1}`, hint: ['The feature, zoomed in', 'The feature being used'][i] }));
+      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ key: String(s.id), targets: [{ sceneId: s.id }], label: `Screenshot ${i + 1}`, hint: ['The feature, zoomed in', 'The feature being used'][i] }));
       return { project, slots };
     },
   },
@@ -108,6 +96,7 @@ export const TEMPLATES: TemplateDef[] = [
     description: 'A clean two-shot comparison — set the scene, then show the improvement.',
     category: 'Comparison',
     swatch: ['#DDF5E8', '#86D3AF'],
+    durationSeconds: 10.5,
     build: () => {
       let id = 1;
       const project: Project = {
@@ -117,7 +106,7 @@ export const TEMPLATES: TemplateDef[] = [
           createImageSlide(id++, null, { headline: '*After*', sub: 'So much better.', anim: 'pop', dur: 4, effect: 'sparkles' }),
         ],
       };
-      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ sceneId: s.id, label: i === 0 ? 'Before screenshot' : 'After screenshot', hint: i === 0 ? 'The old/cluttered state' : 'The improved result' }));
+      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ key: String(s.id), targets: [{ sceneId: s.id }], label: i === 0 ? 'Before screenshot' : 'After screenshot', hint: i === 0 ? 'The old/cluttered state' : 'The improved result' }));
       return { project, slots };
     },
   },
@@ -127,6 +116,7 @@ export const TEMPLATES: TemplateDef[] = [
     description: 'Lead with a quote or rating, then back it up with one great screenshot.',
     category: 'Trust',
     swatch: ['#FFA38F', '#E94B75'],
+    durationSeconds: 10,
     build: () => {
       let id = 1;
       const project: Project = {
@@ -136,7 +126,7 @@ export const TEMPLATES: TemplateDef[] = [
           createImageSlide(id++, null, { headline: 'Rated *4.9 stars*', anim: 'rise', dur: 4, badge: '4.9 ★' }),
         ],
       };
-      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s) => ({ sceneId: s.id, label: 'Screenshot', hint: 'Your best, most polished screen' }));
+      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s) => ({ key: String(s.id), targets: [{ sceneId: s.id }], label: 'Screenshot', hint: 'Your best, most polished screen' }));
       return { project, slots };
     },
   },
@@ -146,6 +136,7 @@ export const TEMPLATES: TemplateDef[] = [
     description: 'Bold and loud — a limited-time offer with confetti and a strong call to action.',
     category: 'Promo',
     swatch: ['#8B5CF6', '#3B0F7A'],
+    durationSeconds: 13,
     build: () => {
       let id = 1;
       const project: Project = {
@@ -155,7 +146,7 @@ export const TEMPLATES: TemplateDef[] = [
           createImageSlide(id++, null, { headline: "Don't *miss out*", anim: 'swing', dur: 3.5 }),
         ],
       };
-      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ sceneId: s.id, label: `Screenshot ${i + 1}`, hint: 'A screen that shows the offer or product' }));
+      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ key: String(s.id), targets: [{ sceneId: s.id }], label: `Screenshot ${i + 1}`, hint: 'A screen that shows the offer or product' }));
       return { project, slots };
     },
   },
@@ -165,6 +156,7 @@ export const TEMPLATES: TemplateDef[] = [
     description: 'Announce a fresh update — a headline slide followed by the new features themselves.',
     category: 'Update',
     swatch: ['#F7F4EE', '#E0D8C8'],
+    durationSeconds: 12.5,
     build: () => {
       let id = 1;
       const project: Project = {
@@ -175,12 +167,8 @@ export const TEMPLATES: TemplateDef[] = [
           createImageSlide(id++, null, { headline: 'Feature two', anim: 'slide', dur: 3.5, badge: 'New' }),
         ],
       };
-      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ sceneId: s.id, label: `Feature ${i + 1} screenshot`, hint: 'A screen showing the new feature' }));
+      const slots: TemplateSlot[] = project.scenes.filter((s) => s.kind === 'image').map((s, i) => ({ key: String(s.id), targets: [{ sceneId: s.id }], label: `Feature ${i + 1} screenshot`, hint: 'A screen showing the new feature' }));
       return { project, slots };
     },
   },
 ];
-
-export function getTemplate(id: string): TemplateDef | undefined {
-  return TEMPLATES.find((t) => t.id === id);
-}

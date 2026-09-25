@@ -11,27 +11,33 @@ import { createProjectFromTemplate } from '@/lib/supabase/projects';
 import { uploadAsset } from '@/lib/supabase/storage';
 
 /** Modal wizard: shows the template's screenshot "slots", lets the user
- * fill in as many as they want (any left empty are just blank slides the
- * user can fill in later, same as a manually-added slide with no image
- * yet), then creates the project and jumps into the editor. */
+ * fill in as many as they want (any left empty are just blank slides/
+ * placeholder story screens the user can fill in later, same as a
+ * manually-added slide with no image yet), then creates the project and
+ * jumps into the editor.
+ *
+ * A slot's upload can fan out to more than one place in the project — see
+ * TemplateSlot.targets in engine/templates/types.ts — e.g. a screenshot
+ * shown mid-story via `showScreen` and then again as its own close-up
+ * slide is one slot, uploaded once, applied to both. */
 export default function TemplateWizard({ templateId, onClose }: { templateId: string; onClose: () => void }) {
   const router = useRouter();
   const template = useMemo(() => getTemplate(templateId), [templateId]);
   const built = useMemo(() => template?.build(), [template]);
-  const [files, setFiles] = useState<Record<number, File>>({});
-  const [previews, setPreviews] = useState<Record<number, string>>({});
+  const [files, setFiles] = useState<Record<string, File>>({});
+  const [previews, setPreviews] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
   if (!template || !built) return null;
   const { project, slots } = built;
 
-  const onFile = async (sceneId: number, file: File | undefined) => {
+  const onFile = async (slotKey: string, file: File | undefined) => {
     if (!file) return;
-    setFiles((prev) => ({ ...prev, [sceneId]: file }));
+    setFiles((prev) => ({ ...prev, [slotKey]: file }));
     try {
       const { image } = await loadImageFile(file);
-      setPreviews((prev) => ({ ...prev, [sceneId]: assetSrc(image) }));
+      setPreviews((prev) => ({ ...prev, [slotKey]: assetSrc(image) }));
     } catch {
       // preview is best-effort; the file still gets used on create
     }
@@ -44,22 +50,60 @@ export default function TemplateWizard({ templateId, onClose }: { templateId: st
     setError('');
     try {
       const supabase = createClient();
+
+      // slotKey -> the one newly-generated assetId every target for that
+      // slot shares, so an ImageSlide and a StorySlide screen fed by the
+      // same slot end up pointing at the same uploaded asset.
+      const assetIdForSlot = new Map<string, string>();
+      for (const slot of slots) {
+        if (files[slot.key]) assetIdForSlot.set(slot.key, newAssetId('img'));
+      }
+      // Every slotted target, filled or not — a template's own build()
+      // points these at its procedural sample-asset keys (so the template
+      // has a working preview before anyone uploads anything), but a real
+      // *created* project must never keep a dangling reference to a
+      // sample-only key that won't exist in its own Storage bucket. Any
+      // target NOT re-mapped here (filled -> the new upload, unfilled ->
+      // explicit null) is left exactly as-is, same as before.
+      const targetAssetId = new Map<string, string | null>(); // `${sceneId}` or `${sceneId}:${screenId}` -> assetId | null
+      for (const slot of slots) {
+        const assetId = assetIdForSlot.get(slot.key) ?? null;
+        for (const target of slot.targets) {
+          targetAssetId.set(target.screenId ? `${target.sceneId}:${target.screenId}` : `${target.sceneId}`, assetId);
+        }
+      }
+
       const scenes: Slide[] = project.scenes.map((s) => {
-        if (s.kind !== 'image') return s;
-        const file = files[s.id];
-        if (!file) return s;
-        return { ...s, imgAssetId: newAssetId('img') };
+        if (s.kind === 'image') {
+          if (!targetAssetId.has(`${s.id}`)) return s;
+          return { ...s, imgAssetId: targetAssetId.get(`${s.id}`)! };
+        }
+        if (s.kind === 'story') {
+          const screens = s.screens.map((screen) => {
+            const key = `${s.id}:${screen.id}`;
+            if (!targetAssetId.has(key)) return screen;
+            // A story screen has no "empty" visual (unlike a blank
+            // ImageSlide) — an unfilled slot keeps its own sample id so
+            // the story slide still has *something* to show rather than a
+            // broken reference; the sample asset just won't resolve once
+            // this becomes a real project without that key uploaded, same
+            // degradation as any other missing asset.
+            return { ...screen, assetId: targetAssetId.get(key) ?? screen.assetId };
+          });
+          return { ...s, screens };
+        }
+        return s;
       });
       const finalProject = { ...project, scenes };
 
       const row = await createProjectFromTemplate(supabase, template.name, finalProject);
 
       await Promise.all(
-        scenes.map(async (s) => {
-          if (s.kind !== 'image' || !s.imgAssetId) return;
-          const file = files[s.id];
-          if (!file) return;
-          await uploadAsset(supabase, row.id, s.imgAssetId, file);
+        slots.map(async (slot) => {
+          const file = files[slot.key];
+          const assetId = assetIdForSlot.get(slot.key);
+          if (!file || !assetId) return;
+          await uploadAsset(supabase, row.id, assetId, file);
         }),
       );
 
@@ -95,17 +139,17 @@ export default function TemplateWizard({ templateId, onClose }: { templateId: st
         </p>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {slots.map((slot) => (
-            <label key={slot.sceneId} className="block cursor-pointer">
+            <label key={slot.key} className="block cursor-pointer">
               <div className="grid aspect-[9/16] place-items-center overflow-hidden rounded-xl border border-dashed border-black/15 bg-neutral-50 dark:border-white/15 dark:bg-neutral-800">
-                {previews[slot.sceneId] ? (
+                {previews[slot.key] ? (
                   // eslint-disable-next-line @next/next/no-img-element -- in-memory/data-URL preview
-                  <img src={previews[slot.sceneId]} alt="" className="h-full w-full object-cover" />
+                  <img src={previews[slot.key]} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="px-2 text-center text-[11px] text-neutral-400">{slot.label}</span>
                 )}
               </div>
               <span className="mt-1 block truncate text-center text-[11px] text-neutral-500 dark:text-neutral-400">{slot.hint}</span>
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(slot.sceneId, e.target.files?.[0])} />
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(slot.key, e.target.files?.[0])} />
             </label>
           ))}
         </div>
