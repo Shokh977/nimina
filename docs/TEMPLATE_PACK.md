@@ -111,6 +111,10 @@ Everything else in your spec maps cleanly. These three don't, one-for-one
 | "double-tap gesture" | Social #5, slide 3 | `Gesture` (image slides) is `none\|tap\|swipeUp\|swipeLeft`; story actions have `tap`/`longPress` but no double-tap. No distinct double-tap anywhere in the type system. | Single `tap` gesture. Combined with the heart-sticker burst on the same beat, it still reads as "liked" — the visual payoff doesn't depend on the tap literally being doubled. |
 | "hearts particle burst" | Social #5, slide 3 | `Effect` is `none\|confetti\|sparkles\|stickers` — no dedicated physics-particle "hearts" type (that was an Engine v2 concept, gone with that branch). | `effect: 'stickers'` with `stickers: '❤️💕💖✨💗'` — the sticker system already takes arbitrary emoji, so this is a direct, no-compromise substitution, not a downgrade. |
 | "plane sprite flying along a path" | Travel #8, slide 4 | `BuiltInSprite` is `scooter\|car\|bike\|pin\|bell\|heart\|cart\|pizza-box` — no plane. (Scooter *is* built in, so Food delivery's sprite beat is a direct match, no adaptation needed there.) | A custom asset-based sprite (`SpriteSource: {kind:'asset', assetId}`) using a small procedurally-drawn plane icon, same path-following/rotate-along-path behavior as a built-in one — visually identical outcome, just not from the built-in enum. |
+| `profile` declared as a slot but never used in the beat table | Social #5 | The slot list names four screenshots (`feed`, `post-detail`, `chat`, `profile`) but the beat-by-beat description only walks through three. Shipping the slot with no beat means the wizard asks the user for a screenshot the video never shows. | Added as its own short beat (slide 4, before the closing statement card) rather than quietly dropping the slot or silently not asking for it. |
+| Two literal text stickers, "Free returns" + "⭐ 4.9" | E-commerce #6, slide 2 | The sticker system (`effect: 'stickers'`) takes emoji graphemes, not arbitrary text — unlike Social's hearts (§2 above), these two are specifically *words*, which stickers can't render. | Split across the two fields that do take text: `badge` for the rating ("⭐ 4.9"), `callout` for "Free returns" — same two facts on screen, drawn by the field that's built for text instead of forced through the emoji-only one. |
+| "Screenshot" slide with "a type-text action showing text being entered" | Productivity #7, slide 3 | `typeText` only exists as a `StorySlide` action; a plain `ImageSlide` (what "Screenshot" implies) can't run one. | Built as a minimal two-action story (`showScreen` + `typeText`) instead of a static image slide — reads almost identically to a zoomed screenshot, but the typing beat is real, not simulated. |
+| "mobile companion on a phone beside the browser" | SaaS #10, slide 4 | Needs two *different* screenshots (a browser dashboard and a phone app) composited in one frame. `layout: 'fan'` only repeats the same image across multiple device outlines — there's no multi-source compositing in one frame anywhere in the engine. | Shipped as its own standalone phone-framed slide; the headline ("And in your pocket") carries the companion relationship narratively instead of showing both devices at once. |
 
 Two more are worth a one-line clarification, not a change:
 
@@ -133,6 +137,25 @@ Reactions-pattern bubble stack), per-slide device/color overrides
 (`SlideStyle.model`/`fcolor`, used for Productivity's browser-then-phone
 and SaaS's browser-then-phone) — all map directly to existing types, no
 adaptation needed.
+
+**Short-cut variants** ("drop the slides marked optional," spec §
+"Rules for every template"): dropping only the marked-optional slide
+doesn't reliably land in 8–10s, and isn't always the right cut even when
+it does — a short cut has to work as a standalone promo, not just hit a
+duration number. Fitness's `intro + streak-badge + outro` was watched cold
+and rejected: a "30-day streak!" celebration with no visible mechanic
+reads as context-free without the intro. Fixed by keeping the workout-
+detail beat (the actual logging mechanic) alongside the streak and
+dropping the intro instead, same ~9s budget. The rule applied since: a
+short cut's beat(s) must be self-explanatory without the intro's context —
+an inherently self-contained beat (a cart, a balance, a product page) can
+stand alone with the intro dropped; a payoff beat with no visible mechanic
+(a streak, a celebration) needs its mechanic beat kept alongside it. All
+four Batch 2 short cuts (post+chat, product+checkout, tasks+inbox-zero,
+dashboard+analytics) passed this check as originally built. E-commerce's
+did run long at measured 10.2s against the 8–10s target — trimmed the
+product slide from 3.4s to 3.0s (9.8s measured) rather than cutting a beat,
+since both remaining beats were already load-bearing.
 
 ## 3. Coverage guarantee — filling the gaps your spec leaves open
 
