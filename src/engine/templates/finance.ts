@@ -343,8 +343,6 @@ export const FINANCE_TEMPLATE: TemplateDef = {
   category: 'Finance',
   swatch: [PRESETS[7].a, PRESETS[7].b],
   durationSeconds: 18.4,
-  previewVideo9x16: '/template-previews/finance/preview-9x16.mp4',
-  previewVideo16x9: '/template-previews/finance/preview-16x9.mp4',
   build: (opts: TemplateBuildOptions = {}) => {
     const variant = opts.variant ?? 'full';
     const strings: FinanceStrings = { ...DEFAULT_FINANCE_STRINGS, ...(opts.strings as Partial<FinanceStrings> | undefined) };
@@ -383,6 +381,7 @@ export const FINANCE_TEMPLATE: TemplateDef = {
     };
     return { project, slots };
   },
+  buildSampleAssets: buildFinanceSampleAssets,
 };
 
 export function buildFinanceSampleAssets(): AssetMap {

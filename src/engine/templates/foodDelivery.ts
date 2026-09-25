@@ -391,8 +391,6 @@ export const FOOD_DELIVERY_TEMPLATE: TemplateDef = {
   category: 'Food delivery',
   swatch: [PRESETS[6].a, PRESETS[6].b],
   durationSeconds: 21.7,
-  previewVideo9x16: '/template-previews/food-delivery/preview-9x16.mp4',
-  previewVideo16x9: '/template-previews/food-delivery/preview-16x9.mp4',
   build: (opts: TemplateBuildOptions = {}) => {
     const variant = opts.variant ?? 'full';
     const strings: FoodDeliveryStrings = { ...DEFAULT_FOOD_DELIVERY_STRINGS, ...(opts.strings as Partial<FoodDeliveryStrings> | undefined) };
@@ -425,6 +423,7 @@ export const FOOD_DELIVERY_TEMPLATE: TemplateDef = {
     };
     return { project, slots };
   },
+  buildSampleAssets: buildFoodDeliverySampleAssets,
 };
 
 export function buildFoodDeliverySampleAssets(): AssetMap {

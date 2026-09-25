@@ -407,7 +407,13 @@ function buildScenes(strings: FitnessStrings, variant: 'full' | 'short'): { scen
   slots.push({ key: 'streak-success', label: 'Streak success', hint: 'The 30-day-streak celebration screen', targets: [{ sceneId: streakSlide.id }] });
 
   if (variant === 'short') {
-    scenes.push(streakSlide);
+    // Not "streak alone" — watched cold (no intro before it, nothing
+    // after but the CTA), a streak celebration with no visible mechanic
+    // read as context-free: "30-day streak" of *what*? The CTA's "first
+    // workout" was the first time the word even appeared. Pairing it with
+    // workout-detail (the actual logging mechanic) fixes that — the intro
+    // drops instead to keep the same ~9s budget.
+    scenes.push(detailSlide, streakSlide);
     return { scenes, slots };
   }
 
@@ -422,8 +428,6 @@ export const FITNESS_TEMPLATE: TemplateDef = {
   category: 'Fitness',
   swatch: [PRESETS[2].a, PRESETS[2].b],
   durationSeconds: 21.3,
-  previewVideo9x16: '/template-previews/fitness/preview-9x16.mp4',
-  previewVideo16x9: '/template-previews/fitness/preview-16x9.mp4',
   build: (opts: TemplateBuildOptions = {}) => {
     const variant = opts.variant ?? 'full';
     const strings: FitnessStrings = { ...DEFAULT_FITNESS_STRINGS, ...(opts.strings as Partial<FitnessStrings> | undefined) };
@@ -445,7 +449,9 @@ export const FITNESS_TEMPLATE: TemplateDef = {
       textAnim: 'rise',
       transition: 'wipe',
       appName: 'Surge',
-      intro: { on: true, dur: 2.2, tagline: strings.introTagline, style: {} },
+      // Short cut drops the intro card to make room for two content beats
+      // instead of one — see buildScenes' short-variant comment.
+      intro: { on: variant === 'full', dur: 2.2, tagline: strings.introTagline, style: {} },
       iconAssetId: null,
       outro: { on: true, dur: 2.5, cta: strings.outroCta, button: 'Download free', small: strings.outroSmall, style: {} },
       quality: '1080',
@@ -456,6 +462,7 @@ export const FITNESS_TEMPLATE: TemplateDef = {
     };
     return { project, slots };
   },
+  buildSampleAssets: buildFitnessSampleAssets,
 };
 
 /** Every procedural screen this template's slots need, keyed the same way
