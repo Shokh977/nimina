@@ -9,7 +9,7 @@ export default function RefundsPage() {
     <LegalPage title="Refund Policy">
       <LegalSection title="How billing works">
         <p>
-          Promo Studio&apos;s Pro subscription is sold and billed by Paddle.com, acting as merchant of record. Paddle handles the transaction, invoicing, and any applicable tax, and
+          Nimina&apos;s Pro subscription is sold and billed by Paddle.com, acting as merchant of record. Paddle handles the transaction, invoicing, and any applicable tax, and
           also handles the mechanics of issuing a refund once one is approved.
         </p>
       </LegalSection>

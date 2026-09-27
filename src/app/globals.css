@@ -22,3 +22,48 @@ body {
   color: var(--foreground);
   font-family: Figtree, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
+
+/* Homepage-only (src/app/page.tsx, src/components/home/) — floating phone
+ * mockup, pulsing "exported" badge dot, and the logo marquee scroll. Scoped
+ * to prefers-reduced-motion: no-preference so reduced-motion users get the
+ * resting/static state instead of a forced animation override in JS. */
+@media (prefers-reduced-motion: no-preference) {
+  .home-float {
+    animation: home-float 5s ease-in-out infinite;
+  }
+  .home-pulse-dot {
+    animation: home-pulse-dot 1.8s ease-in-out infinite;
+  }
+  .home-marquee-track {
+    animation: home-marquee-scroll 26s linear infinite;
+  }
+}
+
+@keyframes home-float {
+  0%,
+  100% {
+    transform: translateY(-10px);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+@keyframes home-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes home-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

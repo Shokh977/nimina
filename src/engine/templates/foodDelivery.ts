@@ -342,6 +342,7 @@ function buildScenes(strings: FoodDeliveryStrings, variant: 'full' | 'short'): {
     sprites: [],
     cameraMode: 'auto',
     cameraKeys: [],
+    hidden: false,
   };
   slots.push({ key: 'menu', label: 'Menu (tall)', hint: 'The full scrollable menu', targets: [{ sceneId: menuStory.id, screenId: 'menu' }] });
   slots.push({ key: 'dish-detail', label: 'Dish detail', hint: 'One dish, expanded — modal', targets: [{ sceneId: menuStory.id, screenId: 'dish-detail' }] });
@@ -372,6 +373,7 @@ function buildScenes(strings: FoodDeliveryStrings, variant: 'full' | 'short'): {
     ],
     cameraMode: 'auto',
     cameraKeys: [],
+    hidden: false,
   };
   slots.push({ key: 'tracking-map', label: 'Tracking map', hint: 'A delivery map the scooter drives across', targets: [{ sceneId: trackingStory.id, screenId: 'tracking-map' }] });
 
@@ -419,6 +421,7 @@ export const FOOD_DELIVERY_TEMPLATE: TemplateDef = {
       music: null,
       volume: 0.8,
       ducking: true,
+      motionSpeed: 100,
       scenes,
     };
     return { project, slots };

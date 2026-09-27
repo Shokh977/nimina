@@ -408,6 +408,7 @@ export function buildStoryDemoProject(): { project: Project; assets: AssetMap } 
     sprites,
     cameraMode: 'auto',
     cameraKeys: [],
+    hidden: false,
   };
 
   const project: Project = {
@@ -434,6 +435,7 @@ export function buildStoryDemoProject(): { project: Project; assets: AssetMap } 
     music: null,
     volume: 0.8,
     ducking: true,
+    motionSpeed: 100,
     scenes: [storySlide],
   };
 

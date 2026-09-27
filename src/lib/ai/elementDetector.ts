@@ -6,7 +6,7 @@ import { DetectElementsResponseSchema, type DetectElementsResponse } from './sch
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 1200;
 
-const SYSTEM_PROMPT = `You detect UI elements in a single app screenshot for Promo Studio, a tool that turns screenshots into promo videos with "cutouts" — pieces of the screenshot that pop out and animate on their own.
+const SYSTEM_PROMPT = `You detect UI elements in a single app screenshot for Nimina, a tool that turns screenshots into promo videos with "cutouts" — pieces of the screenshot that pop out and animate on their own.
 
 Find buttons, cards, list items and chat/message bubbles worth pulling out as their own animated layer. Skip decorative background, plain text paragraphs, and the status bar.
 

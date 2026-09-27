@@ -23,7 +23,15 @@ export interface StoryTimeline {
   total: number;
 }
 
-export function getStoryTimeline(slide: StorySlide): StoryTimeline {
+/** `speedFactor` scales every action's authored duration uniformly (1 =
+ * unscaled, matching the project's motionSpeed=100 default) — used by
+ * playback/export/audio-sync call sites so a global speed change stretches
+ * the whole story proportionally without touching the authored per-action
+ * values. Editor UI that displays/edits a story's own action durations
+ * (CameraEditor, StorySceneEditor, StoryTimelineView) omits it, always
+ * showing the author's actual authored numbers regardless of the global
+ * speed setting. */
+export function getStoryTimeline(slide: StorySlide, speedFactor = 1): StoryTimeline {
   const entries: StoryTimelineEntry[] = [];
   let prevStart = 0;
   let prevEnd = 0;
@@ -31,7 +39,7 @@ export function getStoryTimeline(slide: StorySlide): StoryTimeline {
 
   for (const action of slide.actions) {
     const start = action.startMode === 'with-previous' ? prevStart : prevEnd;
-    const end = start + Math.max(0, action.duration);
+    const end = start + Math.max(0, action.duration) / speedFactor;
     entries.push({ action, start, end });
     prevStart = start;
     prevEnd = end;

@@ -15,6 +15,18 @@ export interface PlaybackEngine {
   togglePlay: () => void;
   seek: (t: number) => void;
   playFrom: (t: number) => void;
+  /** Called by Stage's ResizeObserver with the canvas's *measured* CSS
+   * size (see the stage-box formula in Stage.tsx) — sets the canvas's CSS
+   * width/height, its DPR-aware backing pixel size, and recomputes
+   * scaleRef so render()'s scale parameter still means what it always has
+   * ("backing pixels per project-space unit"), just computed from real
+   * measurement instead of a fixed 0.5/0.6 constant. */
+  setDisplaySize: (cssW: number, cssH: number) => void;
+  /** Header's "Preview" button — temporarily renders without the free-plan
+   * watermark so a free user can see what a paid export looks like.
+   * Doesn't touch plan/export, purely a live-preview toggle. */
+  previewNoWatermark: boolean;
+  togglePreviewWatermark: () => void;
 }
 
 /**
@@ -54,6 +66,14 @@ export function usePlaybackEngine(): PlaybackEngine {
 
   const [playing, setPlaying] = useState(false);
   const [displayT, setDisplayT] = useState(0);
+  const [previewNoWatermark, setPreviewNoWatermark] = useState(false);
+  const previewNoWatermarkRef = useRef(false);
+  const togglePreviewWatermark = useCallback(() => {
+    setPreviewNoWatermark((v) => {
+      previewNoWatermarkRef.current = !v;
+      return !v;
+    });
+  }, []);
 
   const total = getTimeline(project).total;
 
@@ -147,17 +167,21 @@ export function usePlaybackEngine(): PlaybackEngine {
   // Stop and release audio on unmount.
   useEffect(() => stopAudio, [stopAudio]);
 
-  // Resize the backing canvas whenever the output format changes.
-  useEffect(() => {
-    const fmt = FORMATS[project.format];
-    const scale = project.format === '1:1' ? 0.6 : 0.5;
-    scaleRef.current = scale;
+  // Canvas sizing is measured, not guessed — Stage's ResizeObserver calls
+  // this with the actual available CSS box (see Stage.tsx's clamp/cap
+  // formula) whenever the stage resizes or the aspect ratio changes.
+  const setDisplaySize = useCallback((cssW: number, cssH: number) => {
     const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.width = Math.round(fmt.w * scale);
-      canvas.height = Math.round(fmt.h * scale);
-    }
-  }, [project.format]);
+    if (!canvas || cssW <= 0 || cssH <= 0) return;
+    const dpr = window.devicePixelRatio || 1;
+    const bw = Math.round(cssW * dpr);
+    const bh = Math.round(cssH * dpr);
+    if (canvas.width !== bw) canvas.width = bw;
+    if (canvas.height !== bh) canvas.height = bh;
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
+    scaleRef.current = bw / FORMATS[projectRef.current.format].w;
+  }, []);
 
   // Keep the playhead in range if the project got shorter (e.g. a slide was
   // deleted while scrubbed past the new end).
@@ -196,7 +220,7 @@ export function usePlaybackEngine(): PlaybackEngine {
           setDisplayT(next);
         }
         const ctx = canvas.getContext('2d');
-        if (ctx) render(ctx, proj, assetsRef.current.images, tRef.current, scaleRef.current, { watermark: planRef.current === 'free' });
+        if (ctx) render(ctx, proj, assetsRef.current.images, tRef.current, scaleRef.current, { watermark: planRef.current === 'free' && !previewNoWatermarkRef.current });
       }
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -238,5 +262,5 @@ export function usePlaybackEngine(): PlaybackEngine {
     });
   }, [startAudioFrom, stopAudio]);
 
-  return { canvasRef, playing, displayT, total, togglePlay, seek, playFrom };
+  return { canvasRef, playing, displayT, total, togglePlay, seek, playFrom, setDisplaySize, previewNoWatermark, togglePreviewWatermark };
 }

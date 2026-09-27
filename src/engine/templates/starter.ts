@@ -43,6 +43,7 @@ function base(overrides: Partial<Project> = {}): Omit<Project, 'scenes'> {
     music: null,
     volume: 0.8,
     ducking: true,
+    motionSpeed: 100,
     ...overrides,
   };
 }

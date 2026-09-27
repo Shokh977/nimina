@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Device Lab — perspective mockups in canvas 2D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;800&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --page:#EDEEF3; --panel:#FFFFFF; --panel-2:#F3F4F8; --ink:#16171D; --muted:#626878; --line:#D9DCE4;
+  --accent:#4D5BFF; --chip-on:#16171D; --chip-on-ink:#FFFFFF;
+  color-scheme:light; box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --page:#101116; --panel:#191B22; --panel-2:#22252E; --ink:#ECEEF4; --muted:#9BA1B0; --line:#2C3039;
+  --accent:#8D98FF; --chip-on:#ECEEF4; --chip-on-ink:#15161B; color-scheme:dark;}}
+:root[data-theme="dark"]{--page:#101116;--panel:#191B22;--panel-2:#22252E;--ink:#ECEEF4;--muted:#9BA1B0;--line:#2C3039;--accent:#8D98FF;--chip-on:#ECEEF4;--chip-on-ink:#15161B;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 Figtree,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.wrap{max-width:1240px;margin:0 auto;padding:20px clamp(12px,3vw,26px) 40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,390px);gap:24px;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}}
+.stagebox{position:sticky;top:calc(16px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:12px}
+@media (max-width:900px){.stagebox{position:static}}
+canvas{display:block;width:100%;height:auto;border-radius:18px;box-shadow:0 22px 60px rgba(20,18,40,.32);background:#000}
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.play{width:42px;height:42px;border-radius:50%;border:0;background:var(--ink);color:var(--page);display:grid;place-items:center;flex:none}
+.play svg{width:15px;height:15px}
+.stat{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted)}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
+h1{font-family:"Bricolage Grotesque",Figtree,sans-serif;font-weight:800;font-size:26px;letter-spacing:-.02em;margin:0 0 6px;line-height:1.05}
+.sub{margin:0 0 16px;color:var(--muted);font-size:14px}
+.group{margin-top:16px}
+.group > b{display:block;font-size:12.5px;margin-bottom:7px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600}
+.chip[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink);border-color:var(--chip-on)}
+label.row{display:grid;grid-template-columns:76px 1fr 46px;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--muted);margin-top:6px}
+label.row output{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.sw{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600}
+.sw input{width:16px;height:16px;accent-color:var(--accent);margin:0}
+.btn{border:0;border-radius:11px;padding:9px 14px;font-weight:700;background:var(--ink);color:var(--page);font-size:13.5px}
+.btn.ghost{background:var(--panel-2);color:var(--ink);border:1px solid var(--line)}
+.note{font-size:12px;color:var(--muted);margin:10px 0 0}
+code{background:var(--panel-2);padding:1px 5px;border-radius:5px;font-size:.92em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stagebox">
+    <canvas id="c" width="1080" height="1350"></canvas>
+    <div class="bar">
+      <button class="play" id="play" aria-label="Pause"></button>
+      <span class="stat" id="fps">–</span>
+      <span class="stat" id="tris">–</span>
+      <button class="btn ghost" id="reset" style="margin-left:auto">Reset pose</button>
+    </div>
+    <p class="note">Drag on the canvas to orbit the phone. Everything here is drawn with plain canvas 2D — no WebGL.</p>
+  </div>
+
+  <aside class="panel">
+    <h1>3D Device Lab</h1>
+    <p class="sub">Perspective device mockups rendered in a 2D canvas, so they drop into the existing engine and export pipeline unchanged.</p>
+
+    <div class="group"><b>Pose presets</b><div class="chips" id="poses"></div></div>
+    <div class="group"><b>Motion</b><div class="chips" id="motions"></div></div>
+
+    <div class="group"><b>Pose</b>
+      <label class="row">Rotate X<input type="range" id="rx" min="-60" max="60" step="0.5"><output id="rxo"></output></label>
+      <label class="row">Rotate Y<input type="range" id="ry" min="-180" max="180" step="0.5"><output id="ryo"></output></label>
+      <label class="row">Rotate Z<input type="range" id="rz" min="-45" max="45" step="0.5"><output id="rzo"></output></label>
+      <label class="row">Perspective<input type="range" id="fov" min="900" max="6000" step="10"><output id="fovo"></output></label>
+      <label class="row">Scale<input type="range" id="sc" min="0.5" max="1.6" step="0.01"><output id="sco"></output></label>
+    </div>
+
+    <div class="group"><b>Device</b><div class="chips" id="models"></div>
+      <div class="chips" id="colors" style="margin-top:6px"></div>
+    </div>
+
+    <div class="group"><b>Quality</b>
+      <label class="row">Mesh<input type="range" id="sub" min="4" max="32" step="1"><output id="subo"></output></label>
+      <div class="checks">
+        <label class="sw"><input type="checkbox" id="opt-shadow" checked> Contact shadow</label>
+        <label class="sw"><input type="checkbox" id="opt-sheen" checked> Glass sheen</label>
+        <label class="sw"><input type="checkbox" id="opt-edge" checked> Edge highlight</label>
+        <label class="sw"><input type="checkbox" id="opt-wire"> Show mesh</label>
+      </div>
+    </div>
+
+    <div class="group"><b>Screen</b>
+      <div class="chips">
+        <button class="btn ghost" id="upload">Upload a screenshot</button>
+        <button class="btn ghost" id="sampleBtn">Use sample</button>
+      </div>
+      <p class="note">The back of the phone shows a second screen, so “flip to reveal” works.</p>
+    </div>
+  </aside>
+</div>
+<input type="file" id="file" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0">
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const clamp = (v,a=0,b=1) => Math.min(b, Math.max(a, v));
+const easeOutCubic = x => 1 - Math.pow(1-x,3);
+const easeInOutCubic = x => x<.5 ? 4*x*x*x : 1 - Math.pow(-2*x+2,3)/2;
+const spring = (t,{k=300,c=18}={}) => {
+  if (t<=0) return 0;
+  const w = Math.sqrt(k), z = c/(2*w);
+  if (z<1){ const wd = w*Math.sqrt(1-z*z); return 1 - Math.exp(-z*w*t)*(Math.cos(wd*t)+(z*w/wd)*Math.sin(wd*t)); }
+  return 1 - Math.exp(-w*t)*(1+w*t);
+};
+const DEG = Math.PI/180;
+
+/* ───────────────────────── 3D math ─────────────────────────
+   Points are {x,y,z} in device-local space (origin = device centre).
+   rotate() applies Z→X→Y, then project() divides by (dist - z).      */
+function rotate(p, rx, ry, rz){
+  let {x,y,z} = p;
+  const cz=Math.cos(rz), sz=Math.sin(rz);           // roll
+  [x,y] = [x*cz - y*sz, x*sz + y*cz];
+  const cx=Math.cos(rx), sx=Math.sin(rx);           // pitch
+  [y,z] = [y*cx - z*sx, y*sx + z*cx];
+  const cy=Math.cos(ry), sy=Math.sin(ry);           // yaw
+  [x,z] = [x*cy + z*sy, -x*sy + z*cy];
+  return {x,y,z};
+}
+function makeCam(W,H,dist,scale){
+  return { cx:W/2, cy:H/2, dist, f:dist*scale };
+}
+function project(p, cam){
+  const d = cam.dist - p.z;                          // camera sits at +dist looking at -z
+  const s = cam.f / Math.max(1, d);
+  return { x: cam.cx + p.x*s, y: cam.cy + p.y*s, s, d };
+}
+const xform = (p, o, cam) => project(rotate(p, o.rx, o.ry, o.rz), cam);
+
+/* rounded-rect outline sampled as a point list (local z given) */
+function roundRectPoints(w,h,r,z,steps=6){
+  const hw=w/2, hh=h/2, pts=[];
+  const corner = (cx,cy,a0) => { for(let i=0;i<=steps;i++){ const a=a0+(i/steps)*(Math.PI/2); pts.push({x:cx+Math.cos(a)*r, y:cy+Math.sin(a)*r, z}); } };
+  corner(hw-r, hh-r, 0);              // bottom-right
+  corner(-hw+r, hh-r, Math.PI/2);     // bottom-left
+  corner(-hw+r, -hh+r, Math.PI);      // top-left
+  corner(hw-r, -hh+r, Math.PI*1.5);   // top-right
+  return pts;
+}
+const pathFrom = (ctx, pts) => { ctx.beginPath(); pts.forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.closePath(); };
+
+/* ───────── texture mapping: affine per triangle over a subdivided quad ─────────
+   Canvas 2D can only do affine transforms, so a perspective quad is split into a
+   grid; each cell's two triangles are drawn with the affine map that sends the
+   source triangle to the projected one. Enough cells ⇒ perspective is correct.  */
+function drawTriangle(ctx, img, s0,s1,s2, d0,d1,d2, bleed){
+  // expand destination triangle slightly around its centroid to hide seams
+  const gx=(d0.x+d1.x+d2.x)/3, gy=(d0.y+d1.y+d2.y)/3;
+  const e = p => ({ x: gx + (p.x-gx)*bleed, y: gy + (p.y-gy)*bleed });
+  const e0=e(d0), e1=e(d1), e2=e(d2);
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(e0.x,e0.y); ctx.lineTo(e1.x,e1.y); ctx.lineTo(e2.x,e2.y); ctx.closePath(); ctx.clip();
+  // solve the affine matrix mapping source→dest
+  const dx1=s1.u-s0.u, dy1=s1.v-s0.v, dx2=s2.u-s0.u, dy2=s2.v-s0.v;
+  const det = dx1*dy2 - dx2*dy1;
+  if (Math.abs(det) > 1e-9){
+    const px1=d1.x-d0.x, py1=d1.y-d0.y, px2=d2.x-d0.x, py2=d2.y-d0.y;
+    const a=(px1*dy2 - px2*dy1)/det, b=(py1*dy2 - py2*dy1)/det;
+    const c=(px2*dx1 - px1*dx2)/det, d=(py2*dx1 - py1*dx2)/det;
+    ctx.transform(a,b,c,d, d0.x - a*s0.u - c*s0.v, d0.y - b*s0.u - d*s0.v);
+    // draw only this triangle's slice of the source, not the whole image
+    const bx = Math.max(0, Math.min(s0.u,s1.u,s2.u) - 1), by = Math.max(0, Math.min(s0.v,s1.v,s2.v) - 1);
+    const bw = Math.min(img.width  - bx, Math.max(s0.u,s1.u,s2.u) + 1 - bx);
+    const bh = Math.min(img.height - by, Math.max(s0.v,s1.v,s2.v) + 1 - by);
+    if (bw > 0 && bh > 0) ctx.drawImage(img, bx, by, bw, bh, bx, by, bw, bh);
+  }
+  ctx.restore();
+}
+function drawTexturedQuad(ctx, img, w, h, z, o, cam, N, wire){
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  // cover-fit the image into the screen rect
+  const s = Math.max(w/iw, h/ih), cw = w/s, ch = h/s;
+  const u0 = (iw-cw)/2, v0 = 0;                     // top-aligned crop, like the product does
+  const grid = [];
+  for (let j=0;j<=N;j++){
+    const row = [];
+    for (let i=0;i<=N;i++){
+      const fx=i/N, fy=j/N;
+      const p = xform({ x:(fx-0.5)*w, y:(fy-0.5)*h, z }, o, cam);
+      row.push({ x:p.x, y:p.y, u:u0+fx*cw, v:v0+fy*ch });
+    }
+    grid.push(row);
+  }
+  const bleed = 1.02;
+  let tris = 0;
+  for (let j=0;j<N;j++) for (let i=0;i<N;i++){
+    const a=grid[j][i], b=grid[j][i+1], c=grid[j+1][i+1], d=grid[j+1][i];
+    drawTriangle(ctx, img, {u:a.u,v:a.v},{u:b.u,v:b.v},{u:c.u,v:c.v}, a,b,c, bleed);
+    drawTriangle(ctx, img, {u:a.u,v:a.v},{u:c.u,v:c.v},{u:d.u,v:d.v}, a,c,d, bleed);
+    tris += 2;
+  }
+  if (wire){
+    ctx.save(); ctx.strokeStyle='rgba(0,255,190,.5)'; ctx.lineWidth=1;
+    for (let j=0;j<=N;j++){ ctx.beginPath(); grid[j].forEach((p,i)=> i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke(); }
+    for (let i=0;i<=N;i++){ ctx.beginPath(); for(let j=0;j<=N;j++){ const p=grid[j][i]; j?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);} ctx.stroke(); }
+    ctx.restore();
+  }
+  return tris;
+}
+
+/* ───────────────────────── device ───────────────────────── */
+const MODELS = {
+  island:  { label:'Island phone', w:560, h:1180, t:56, r:92, bez:20, sr:74, cut:'island' },
+  notch:   { label:'Notch phone',  w:560, h:1180, t:58, r:88, bez:22, sr:70, cut:'notch' },
+  android: { label:'Android',      w:540, h:1180, t:52, r:66, bez:16, sr:52, cut:'punch' },
+  tablet:  { label:'Tablet',       w:860, h:1180, t:50, r:56, bez:30, sr:30, cut:'cam' }
+};
+const COLORS = {
+  graphite:{ label:'Graphite', body:'#2A2C33', edge:'#4A4D57', dark:'#141519' },
+  silver:  { label:'Silver',   body:'#D7DAE0', edge:'#FFFFFF', dark:'#9DA2AC' },
+  titanium:{ label:'Titanium', body:'#B9AF9F', edge:'#EFE7DA', dark:'#7E7566' },
+  midnight:{ label:'Midnight', body:'#1F2A44', edge:'#42557E', dark:'#0E1524' },
+  rose:    { label:'Rose',     body:'#E6B5B0', edge:'#FFF0ED', dark:'#B4827D' }
+};
+const LIGHT = { x:-0.45, y:-0.75, z:0.5 };   // normalized-ish light direction
+
+function shadeFor(nx,ny,nz,col){
+  const len = Math.hypot(nx,ny,nz) || 1;
+  const d = (nx*LIGHT.x + ny*LIGHT.y + nz*LIGHT.z) / len;
+  const k = clamp(0.35 + d*0.75, 0, 1);
+  return mix(col.dark, col.edge, k);
+}
+function mix(a,b,t){
+  const pa=hex(a), pb=hex(b);
+  return `rgb(${Math.round(pa[0]+(pb[0]-pa[0])*t)},${Math.round(pa[1]+(pb[1]-pa[1])*t)},${Math.round(pa[2]+(pb[2]-pa[2])*t)})`;
+}
+function hex(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+
+function drawDevice(ctx, o, cam, opts){
+  const M = MODELS[opts.model], C = COLORS[opts.color];
+  const { w,h,t,r,bez,sr } = M;
+  const hz = t/2;
+  const front = roundRectPoints(w,h,r, hz);
+  const back  = roundRectPoints(w,h,r, -hz);
+  const nFront = rotate({x:0,y:0,z:1}, o.rx,o.ry,o.rz);     // face normal after rotation
+  const facing = nFront.z > 0;
+  let tris = 0;
+
+  // ── contact shadow: silhouette flattened onto a ground plane behind the device
+  if (opts.shadow){
+    const lift = 0.5 + Math.abs(Math.sin(o.ry))*0.35;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    const pts = front.map(p => { const q = xform(p, o, cam); return { x: q.x + Math.sin(o.ry)*34, y: q.y + 46 + 30*lift }; });
+    ctx.filter = `blur(${Math.round(26*lift)}px)`;
+    pathFrom(ctx, pts); ctx.fillStyle = 'rgba(8,10,24,.55)'; ctx.fill();
+    ctx.filter = 'none'; ctx.restore();
+  }
+
+  const pf = front.map(p => xform(p, o, cam));
+  const pb = back.map(p => xform(p, o, cam));
+
+  // ── back shell (only the part that peeks out) + camera bump when flipped away
+  ctx.save();
+  pathFrom(ctx, pb); ctx.fillStyle = mix(C.dark, C.body, 0.5); ctx.fill();
+  ctx.restore();
+
+  // ── side band: one quad per outline segment, shaded by its own normal, drawn
+  //    only where the quad faces the camera (back-face culling by winding order)
+  for (let i=0;i<front.length;i++){
+    const j = (i+1) % front.length;
+    const a=pf[i], b=pf[j], c=pb[j], d=pb[i];
+    const area = (b.x-a.x)*(c.y-a.y) - (c.x-a.x)*(b.y-a.y);
+    if ((facing && area < 0) || (!facing && area > 0)) continue;
+    const e = front[j], f0 = front[i];
+    const n = rotate({ x:(e.x+f0.x)/2, y:(e.y+f0.y)/2, z:0 }, o.rx,o.ry,o.rz);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.closePath();
+    ctx.fillStyle = shadeFor(n.x, n.y, n.z, C); ctx.fill();
+  }
+
+  if (facing){
+    // ── front: body plate, black glass, screen mesh, cutout, sheen
+    ctx.save(); pathFrom(ctx, pf); ctx.fillStyle = C.body; ctx.fill();
+    if (opts.edge){ ctx.lineWidth = Math.max(1.2, 3*cam.f/cam.dist); ctx.strokeStyle = mix(C.body, C.edge, 0.55 + 0.4*Math.sin(o.ry)); ctx.stroke(); }
+    ctx.restore();
+
+    const glass = roundRectPoints(w-bez*1.2, h-bez*1.2, r-bez*0.6, hz+0.6).map(p=>xform(p,o,cam));
+    ctx.save(); pathFrom(ctx, glass); ctx.fillStyle = '#05050A'; ctx.fill(); ctx.restore();
+
+    const sw = w - bez*2, sh = h - bez*2;
+    const screenPts = roundRectPoints(sw, sh, sr, hz+1).map(p=>xform(p,o,cam));
+    ctx.save(); pathFrom(ctx, screenPts); ctx.clip();
+    tris += drawTexturedQuad(ctx, opts.screen, sw, sh, hz+1, o, cam, opts.sub, opts.wire);
+    ctx.restore();
+
+    // cutout
+    ctx.save();
+    ctx.fillStyle = '#000';
+    if (M.cut === 'island'){
+      const pts = roundRectPoints(w*0.3, w*0.085, w*0.043, hz+2).map(p => xform({x:p.x, y:p.y - h/2 + bez + w*0.075, z:p.z}, o, cam));
+      pathFrom(ctx, pts); ctx.fill();
+    } else if (M.cut === 'notch'){
+      const pts = roundRectPoints(w*0.5, w*0.075, w*0.03, hz+2).map(p => xform({x:p.x, y:p.y - h/2 + bez + w*0.02, z:p.z}, o, cam));
+      pathFrom(ctx, pts); ctx.fill();
+    } else if (M.cut === 'punch'){
+      const pts = roundRectPoints(w*0.055, w*0.055, w*0.03, hz+2).map(p => xform({x:p.x, y:p.y - h/2 + bez + w*0.06, z:p.z}, o, cam));
+      pathFrom(ctx, pts); ctx.fill();
+    } else {
+      const pts = roundRectPoints(w*0.02, w*0.02, w*0.01, hz+2).map(p => xform({x:p.x, y:p.y - h/2 + bez*0.5, z:p.z}, o, cam));
+      pathFrom(ctx, pts); ctx.fill();
+    }
+    ctx.restore();
+
+    // ── glass sheen: a band sweeping across as yaw changes
+    if (opts.sheen){
+      ctx.save(); pathFrom(ctx, glass); ctx.clip();
+      const a = xform({x:-w, y:-h/2, z:hz+2}, o, cam), b = xform({x:w, y:h/2, z:hz+2}, o, cam);
+      const g = ctx.createLinearGradient(a.x,a.y,b.x,b.y);
+      const pos = clamp(0.5 + Math.sin(o.ry)*0.8, 0.02, 0.98);
+      const str = 0.05 + Math.abs(Math.sin(o.ry))*0.22;
+      g.addColorStop(Math.max(0,pos-0.22),'rgba(255,255,255,0)');
+      g.addColorStop(pos, `rgba(255,255,255,${str})`);
+      g.addColorStop(Math.min(1,pos+0.22),'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.fill(); ctx.restore();
+    }
+  } else {
+    // ── back of the phone: shell, camera island, logo notch
+    ctx.save(); pathFrom(ctx, pf); ctx.fillStyle = mix(C.body, C.dark, 0.25); ctx.fill();
+    if (opts.edge){ ctx.lineWidth = 2; ctx.strokeStyle = mix(C.body, C.edge, 0.4); ctx.stroke(); }
+    ctx.restore();
+    const camPts = roundRectPoints(w*0.42, w*0.42, w*0.12, hz+1).map(p => xform({x:p.x - w*0.22, y:p.y - h*0.32, z:p.z}, o, cam));
+    ctx.save(); pathFrom(ctx, camPts); ctx.fillStyle = mix(C.dark,'#000',0.35); ctx.fill(); ctx.restore();
+    [[-0.30,-0.37],[-0.14,-0.37],[-0.22,-0.26]].forEach(([fx,fy])=>{
+      const lens = roundRectPoints(w*0.15, w*0.15, w*0.075, hz+2).map(p => xform({x:p.x + w*fx, y:p.y + h*fy, z:p.z}, o, cam));
+      ctx.save(); pathFrom(ctx, lens); ctx.fillStyle='#0B0D12'; ctx.fill();
+      ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.stroke(); ctx.restore();
+    });
+  }
+  return tris;
+}
+
+/* ───────────────────────── sample screen ───────────────────────── */
+function makeSample(){
+  const cv = document.createElement('canvas'); cv.width=600; cv.height=1300;
+  const x = cv.getContext('2d');
+  const f=(w,s)=>`${w} ${s}px Figtree, system-ui, sans-serif`;
+  const rr=(X,Y,W,H,R)=>{x.beginPath();x.moveTo(X+R,Y);x.arcTo(X+W,Y,X+W,Y+H,R);x.arcTo(X+W,Y+H,X,Y+H,R);x.arcTo(X,Y+H,X,Y,R);x.arcTo(X,Y,X+W,Y,R);x.closePath();};
+  x.fillStyle='#F5F6FA'; x.fillRect(0,0,600,1300);
+  x.fillStyle='#15161B'; x.font=f(700,24); x.textBaseline='middle'; x.fillText('9:41',48,52);
+  rr(500,42,44,21,6); x.fill();
+  x.textBaseline='alphabetic';
+  x.font=f(800,58); x.fillText('Today',40,168);
+  x.fillStyle='#7A7F8C'; x.font=f(500,24); x.fillText('Tuesday, June 3',42,208);
+  const g=x.createLinearGradient(40,248,560,420); g.addColorStop(0,'#6D6BFF'); g.addColorStop(1,'#4A3FE0');
+  x.fillStyle=g; rr(40,248,520,170,34); x.fill();
+  x.fillStyle='#fff'; x.font=f(800,46); x.fillText('3 of 5',76,326);
+  x.globalAlpha=.85; x.font=f(500,24); x.fillText('habits done today',78,366); x.globalAlpha=1;
+  x.lineWidth=12; x.lineCap='round'; x.strokeStyle='rgba(255,255,255,.25)';
+  x.beginPath(); x.arc(470,333,50,0,Math.PI*2); x.stroke();
+  x.strokeStyle='#fff'; x.beginPath(); x.arc(470,333,50,-Math.PI/2,-Math.PI/2+0.6*Math.PI*2); x.stroke();
+  [['Morning walk','12-day streak','#22B573'],['Read 20 pages','5-day streak','#FF8A3D'],['Drink water','6 of 8 glasses','#2FA8FF'],['Stretch','9-day streak','#E056A0'],['Journal','Not yet today','#8C8FA0']]
+  .forEach(([n,s,col],i)=>{
+    const y=452+i*140;
+    x.save(); x.shadowColor='rgba(20,20,40,.07)'; x.shadowBlur=18; x.shadowOffsetY=5; x.fillStyle='#fff'; rr(40,y,520,118,28); x.fill(); x.restore();
+    x.fillStyle=col; x.beginPath(); x.arc(100,y+59,25,0,Math.PI*2); x.fill();
+    x.strokeStyle='#fff'; x.lineWidth=5; x.lineJoin='round';
+    x.beginPath(); x.moveTo(89,y+60); x.lineTo(97,y+68); x.lineTo(112,y+51); x.stroke();
+    x.fillStyle='#15161B'; x.font=f(700,28); x.fillText(n,146,y+55);
+    x.fillStyle='#7A7F8C'; x.font=f(500,21); x.fillText(s,146,y+88);
+  });
+  x.fillStyle='#fff'; x.fillRect(0,1170,600,130);
+  [0,1,2,3].forEach(i=>{ x.fillStyle = i? '#C3C5D0' : '#5B5BF7'; rr(88+i*128,1205,40,40,12); x.fill(); });
+  return cv;
+}
+function makeBack(){
+  const cv = document.createElement('canvas'); cv.width=600; cv.height=1300;
+  const x = cv.getContext('2d');
+  const g = x.createLinearGradient(0,0,600,1300); g.addColorStop(0,'#6D6BFF'); g.addColorStop(1,'#3325C9');
+  x.fillStyle=g; x.fillRect(0,0,600,1300);
+  x.fillStyle='#fff'; x.textAlign='center';
+  x.font='800 150px Figtree, sans-serif'; x.fillText('21',300,620);
+  x.font='700 44px Figtree, sans-serif'; x.fillText('day streak',300,690);
+  x.textAlign='left';
+  return cv;
+}
+
+/* ───────────────────────── scene / UI ───────────────────────── */
+const cv = $('#c'), ctx = cv.getContext('2d');
+const SAMPLE = makeSample(), BACK = makeBack();
+const state = {
+  model:'island', color:'graphite', screen:SAMPLE, back:BACK,
+  rx:-8, ry:-26, rz:3, fov:2600, scale:1, sub:16,
+  shadow:true, sheen:true, edge:true, wire:false,
+  motion:'turntable', playing:true
+};
+const POSES = {
+  front:      { label:'Front',    rx:0,   ry:0,    rz:0 },
+  threeQL:    { label:'¾ left',   rx:-8,  ry:-26,  rz:3 },
+  threeQR:    { label:'¾ right',  rx:-8,  ry:26,   rz:-3 },
+  hero:       { label:'Hero tilt',rx:-16, ry:-34,  rz:6 },
+  flat:       { label:'Lying flat',rx:46, ry:-12,  rz:-4 },
+  back:       { label:'Back',     rx:-6,  ry:168,  rz:-2 }
+};
+const MOTIONS = {
+  still:     'Still',
+  turntable: 'Turntable',
+  swing:     'Swing in',
+  flip:      'Flip reveal',
+  unfold:    'Unfold',
+  handheld:  'Handheld',
+  orbit:     'Orbit'
+};
+
+function motionPose(t){
+  const b = { rx:state.rx, ry:state.ry, rz:state.rz, scale:state.scale };
+  const L = 4.2, u = (t % L) / L;                      // 4.2s loop
+  switch(state.motion){
+    case 'turntable': b.ry = state.ry + Math.sin(t*0.8)*22; b.rx = state.rx + Math.sin(t*0.55)*4; break;
+    case 'swing': {
+      const p = spring(u*L, {k:260, c:17});
+      b.ry = -78 + (state.ry + 78)*p; b.rz = 14*(1-p) + state.rz*p; b.scale = state.scale*(0.86+0.14*p);
+      break;
+    }
+    case 'flip': {
+      const p = easeInOutCubic(clamp((u-0.12)/0.55));
+      b.ry = state.ry + 180*p; b.rx = state.rx + Math.sin(p*Math.PI)*8;
+      break;
+    }
+    case 'unfold': {
+      const p = spring(u*L, {k:200, c:20});
+      b.rx = 74 - (74 - state.rx)*p; b.ry = state.ry*p; b.scale = state.scale*(0.9+0.1*p);
+      break;
+    }
+    case 'handheld':
+      b.rx = state.rx + Math.sin(t*1.7)*1.6 + Math.sin(t*3.9)*0.7;
+      b.ry = state.ry + Math.sin(t*1.3+1)*2.1 + Math.sin(t*4.3)*0.8;
+      b.rz = state.rz + Math.sin(t*1.1)*0.8;
+      break;
+    case 'orbit': b.ry = state.ry + Math.sin(t*0.55)*40; b.rx = state.rx + Math.cos(t*0.55)*7; break;
+  }
+  return b;
+}
+
+let t0 = performance.now()/1000, t = 0, frames = 0, fpsT = performance.now(), lastTris = 0;
+function frame(now){
+  const sec = now/1000;
+  if (state.playing) t += Math.min(0.05, sec - t0);
+  t0 = sec;
+  const p = motionPose(t);
+  const flipped = state.motion === 'flip';
+  const o = { rx:p.rx*DEG, ry:p.ry*DEG, rz:p.rz*DEG };
+  const cam = makeCam(cv.width, cv.height, state.fov, p.scale * 0.62);
+
+  // background
+  const bg = ctx.createLinearGradient(0,0,cv.width,cv.height);
+  bg.addColorStop(0,'#1B1E2B'); bg.addColorStop(0.55,'#2A2350'); bg.addColorStop(1,'#101219');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,cv.width,cv.height);
+  const rg = ctx.createRadialGradient(cv.width*0.3, cv.height*0.3, 0, cv.width*0.3, cv.height*0.3, cv.width);
+  rg.addColorStop(0,'rgba(109,91,255,.35)'); rg.addColorStop(1,'rgba(109,91,255,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0,0,cv.width,cv.height);
+
+  // which texture faces us (flip reveal swaps at 90°)
+  const nz = rotate({x:0,y:0,z:1}, o.rx,o.ry,o.rz).z;
+  const screen = (flipped && nz <= 0) ? state.back : state.screen;
+  lastTris = drawDevice(ctx, o, cam, {
+    model:state.model, color:state.color, screen,
+    sub:state.sub, shadow:state.shadow, sheen:state.sheen, edge:state.edge, wire:state.wire
+  });
+
+  frames++;
+  if (now - fpsT > 500){
+    $('#fps').textContent = `${Math.round(frames*1000/(now-fpsT))} fps`;
+    $('#tris').textContent = `${lastTris} triangles · mesh ${state.sub}×${state.sub}`;
+    frames = 0; fpsT = now;
+  }
+  requestAnimationFrame(frame);
+}
+
+/* controls */
+function chips(el, items, get, set){
+  const draw = () => { el.innerHTML = Object.entries(items).map(([k,v]) =>
+    `<button class="chip" data-v="${k}" aria-pressed="${get()===k}">${typeof v==='string'?v:v.label}</button>`).join(''); };
+  draw();
+  el.addEventListener('click', e => { const b = e.target.closest('button'); if(!b) return; set(b.dataset.v); draw(); });
+  return draw;
+}
+const drawPoses = chips($('#poses'), POSES, ()=>'', k => { const p = POSES[k]; state.rx=p.rx; state.ry=p.ry; state.rz=p.rz; syncSliders(); });
+const drawMotions = chips($('#motions'), MOTIONS, ()=>state.motion, k => { state.motion = k; t = 0; });
+chips($('#models'), MODELS, ()=>state.model, k => state.model = k);
+chips($('#colors'), COLORS, ()=>state.color, k => state.color = k);
+
+const sliders = [['rx','rx','°'],['ry','ry','°'],['rz','rz','°'],['fov','fov',''],['sc','scale','×'],['sub','sub','']];
+function syncSliders(){ sliders.forEach(([id,key,unit])=>{ const el=$('#'+id); el.value = state[key];
+  const o = $('#'+(id==='sc'?'sco':id==='sub'?'subo':id+'o')); if(o) o.textContent = (key==='scale'? state[key].toFixed(2) : Math.round(state[key])) + unit; }); }
+sliders.forEach(([id,key])=>{ $('#'+id).addEventListener('input', e => { state[key] = +e.target.value; syncSliders(); }); });
+[['opt-shadow','shadow'],['opt-sheen','sheen'],['opt-edge','edge'],['opt-wire','wire']].forEach(([id,key])=>{
+  $('#'+id).addEventListener('change', e => state[key] = e.target.checked);
+});
+$('#reset').addEventListener('click', ()=>{ Object.assign(state,{rx:-8,ry:-26,rz:3,fov:2600,scale:1}); syncSliders(); });
+
+const ICON_PLAY='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>';
+const ICON_PAUSE='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg>';
+function setPlay(){ $('#play').innerHTML = state.playing?ICON_PAUSE:ICON_PLAY; }
+$('#play').addEventListener('click', ()=>{ state.playing = !state.playing; setPlay(); });
+
+// drag to orbit
+let drag = null;
+cv.addEventListener('pointerdown', e => { drag = { x:e.clientX, y:e.clientY, rx:state.rx, ry:state.ry }; state.motion='still'; drawMotions(); cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => { if(!drag) return;
+  const k = cv.clientWidth / cv.width * 1.8;
+  state.ry = clamp(drag.ry + (e.clientX-drag.x)/k*0.6, -180, 180);
+  state.rx = clamp(drag.rx - (e.clientY-drag.y)/k*0.6, -60, 60);
+  syncSliders();
+});
+cv.addEventListener('pointerup', ()=> drag=null);
+
+$('#upload').addEventListener('click', ()=> $('#file').click());
+$('#file').addEventListener('change', e => {
+  const f = e.target.files[0]; e.target.value=''; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => { const img = new Image(); img.onload = ()=> state.screen = img; img.src = r.result; };
+  r.readAsDataURL(f);
+});
+$('#sampleBtn').addEventListener('click', ()=> state.screen = SAMPLE);
+
+syncSliders(); setPlay();
+if (document.fonts) document.fonts.ready.then(()=>{ const s = makeSample(); state.screen = (state.screen===SAMPLE)? s : state.screen; });
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

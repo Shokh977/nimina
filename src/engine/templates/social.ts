@@ -342,6 +342,7 @@ export const SOCIAL_TEMPLATE: TemplateDef = {
       music: null,
       volume: 0.8,
       ducking: true,
+      motionSpeed: 100,
       scenes,
     };
     return { project, slots };

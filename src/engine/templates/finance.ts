@@ -324,6 +324,7 @@ function buildScenes(strings: FinanceStrings, variant: 'full' | 'short'): { scen
     sprites: [],
     cameraMode: 'auto',
     cameraKeys: [],
+    hidden: false,
   };
   slots.push({ key: 'transfer-success', label: 'Transfer success', hint: 'The confirmation screen after sending money', targets: [{ sceneId: transferStory.id, screenId: 'transfer-success' }] });
 
@@ -377,6 +378,7 @@ export const FINANCE_TEMPLATE: TemplateDef = {
       music: null,
       volume: 0.8,
       ducking: true,
+      motionSpeed: 100,
       scenes,
     };
     return { project, slots };

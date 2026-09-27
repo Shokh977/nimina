@@ -122,7 +122,7 @@ function activeEntries(entries: StoryTimelineEntry[], local: number): StoryTimel
 }
 
 export function renderStory(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, slide: StorySlide, style: ResolvedStyle, local: number, W: number, H: number): void {
-  const timeline = getStoryTimeline(slide);
+  const timeline = getStoryTimeline(slide, project.motionSpeed / 100);
   const font = FONTS[project.font];
   const state = resolveScreenState(timeline.entries, local);
   const camera = resolveCamera(slide, timeline, local);

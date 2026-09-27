@@ -18,6 +18,9 @@ import type {
   HlStyle,
   ModelDef,
   ModelKey,
+  Motion3DKey,
+  Pose3D,
+  PosePresetKey,
   SlideAnim,
   SlideLayout,
   TextAnim,
@@ -79,6 +82,34 @@ export const LAYOUTS: Array<[SlideLayout, string]> = [
   ['single', 'Single device'],
   ['fan', 'Fan of three'],
 ];
+export const MOTION3D: Array<[Motion3DKey, string]> = [
+  ['none', 'Still'],
+  ['turntable', 'Turntable'],
+  ['swing', 'Swing in'],
+  ['flip', 'Flip reveal'],
+  ['unfold', 'Unfold'],
+  ['handheld', 'Handheld'],
+  ['orbit', 'Orbit'],
+];
+/** rx/ry/rz in degrees. `front`/`threeQL`/`threeQR`/`hero`/`flat` ported
+ * directly from legacy/device-3d-lab-download.html's POSES object
+ * (fov→distance, with `scale` folded in below since the prototype's fov
+ * and scale are independent sliders but this engine folds "how big/far"
+ * into one `scale` multiplier applied on top of a fixed reference
+ * distance). `floating` is new (not in the prototype) — a gentle tilt
+ * with a reduced scale, so the device reads as smaller/hovering rather
+ * than posed against a surface. No static "Back" preset, per explicit
+ * user feedback — the back of the device is still reachable dynamically
+ * via the 'flip'/'unfold' motion presets (resolveMotion3d in
+ * src/engine/pose3d.ts), just not offered as its own static pose. */
+export const POSE_PRESETS: Record<PosePresetKey, { label: string } & Pose3D> = {
+  front: { label: 'Front', rx: 0, ry: 0, rz: 0, distance: 2600, scale: 1 },
+  threeQL: { label: '¾ left', rx: -8, ry: -26, rz: 3, distance: 2600, scale: 1 },
+  threeQR: { label: '¾ right', rx: -8, ry: 26, rz: -3, distance: 2600, scale: 1 },
+  hero: { label: 'Hero tilt', rx: -16, ry: -34, rz: 6, distance: 2600, scale: 1 },
+  flat: { label: 'Lying flat', rx: 46, ry: -12, rz: -4, distance: 2600, scale: 1 },
+  floating: { label: 'Floating', rx: -10, ry: -14, rz: 2, distance: 3400, scale: 0.82 },
+};
 export const EFFECTS: Array<[Effect, string]> = [
   ['none', 'None'],
   ['confetti', 'Confetti burst'],
@@ -113,12 +144,17 @@ export const BG_PATTERNS: Array<[BgPattern, string]> = [
 ];
 
 export const MODELS: Record<ModelKey, ModelDef> = {
-  island: { label: 'Island phone', ratio: 0.486, r: 0.165, bez: 0.04, sr: 0.125, cut: 'island' },
-  notch: { label: 'Notch phone', ratio: 0.486, r: 0.155, bez: 0.042, sr: 0.115, cut: 'notch' },
-  punch: { label: 'Android', ratio: 0.465, r: 0.11, bez: 0.032, sr: 0.085, cut: 'punch' },
-  tablet: { label: 'Tablet', ratio: 0.72, r: 0.075, bez: 0.05, sr: 0.035, cut: 'cam' },
-  browser: { label: 'Browser', ratio: 1.5, r: 0.03, bez: 0, sr: 0, cut: 'browser' },
-  card: { label: 'No frame', ratio: 0.486, r: 0.09, bez: 0, sr: 0.09, cut: 'none' },
+  // t3d (device thickness, fraction of width) is only used by the 3D pose
+  // renderer (drawDevice3D) — ported from legacy/device-3d-lab-download.html's
+  // per-model `t` values (t/w), which only defined island/notch/android/tablet;
+  // browser/card have no real-world "thickness" so use a thin nominal value
+  // (just enough for a visible edge when tilted).
+  island: { label: 'Island phone', ratio: 0.486, r: 0.165, bez: 0.04, sr: 0.125, cut: 'island', t3d: 0.1 },
+  notch: { label: 'Notch phone', ratio: 0.486, r: 0.155, bez: 0.042, sr: 0.115, cut: 'notch', t3d: 0.104 },
+  punch: { label: 'Android', ratio: 0.465, r: 0.11, bez: 0.032, sr: 0.085, cut: 'punch', t3d: 0.096 },
+  tablet: { label: 'Tablet', ratio: 0.72, r: 0.075, bez: 0.05, sr: 0.035, cut: 'cam', t3d: 0.058 },
+  browser: { label: 'Browser', ratio: 1.5, r: 0.03, bez: 0, sr: 0, cut: 'browser', t3d: 0.02 },
+  card: { label: 'No frame', ratio: 0.486, r: 0.09, bez: 0, sr: 0.09, cut: 'none', t3d: 0.02 },
 };
 
 export const FCOLORS: FrameColorDef[] = [
@@ -150,6 +186,9 @@ export const SLIDE_DEFAULTS = {
   stickers: '🔥⭐💯',
   scroll: false,
   counter: null as CounterConfig | null,
+  hidden: false,
+  pose3d: null as Pose3D | null,
+  motion3d: 'none' as Motion3DKey,
 };
 
 /** Starting values when a user first enables a counter in the editor —

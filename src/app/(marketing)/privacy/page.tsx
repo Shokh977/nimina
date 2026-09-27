@@ -9,7 +9,7 @@ export default function PrivacyPage() {
     <LegalPage title="Privacy Policy">
       <LegalSection title="Who we are">
         <p>
-          Promo Studio (&quot;we&quot;, &quot;us&quot;) is operated by [your legal name / company name], [registered address or &quot;an individual seller based in [country]&quot;]. If you
+          Nimina (&quot;we&quot;, &quot;us&quot;) is operated by [your legal name / company name], [registered address or &quot;an individual seller based in [country]&quot;]. If you
           have questions about this policy, contact [privacy contact email].
         </p>
       </LegalSection>

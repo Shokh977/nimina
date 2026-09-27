@@ -2,9 +2,8 @@
 
 import { useRef } from 'react';
 
-import { ANIMS, CAMERAS, DEFAULT_COUNTER, DURS, EFFECTS, GESTURES, LAYOUTS } from '@/engine/constants';
-import { resolveStyle } from '@/engine/render';
-import type { ClassicSlide, CounterConfig, CounterFormat, Effect, ImageSlide, Slide } from '@/engine/types';
+import { ANIMS, CAMERAS, DEFAULT_COUNTER, DURS, EFFECTS, GESTURES, LAYOUTS, MOTION3D, POSE_PRESETS, PRESETS } from '@/engine/constants';
+import type { ClassicSlide, CounterConfig, CounterFormat, Effect, ImageSlide, Pose3D, PosePresetKey, Slide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { isPro, PRO_ONLY_EFFECTS } from '@/lib/plan';
 import { createClient } from '@/lib/supabase/client';
@@ -15,8 +14,19 @@ import StyleEditor from '../StyleEditor';
 import { KEYS_IMAGE, KEYS_TEXT } from '../styleFields';
 import { sceneStart } from '../timelineHelpers';
 import Details from '../ui/Details';
+import RangeInput from '../ui/RangeInput';
+import SectionLabel from '../ui/SectionLabel';
+import SegmentedControl from '../ui/SegmentedControl';
+import SwatchGrid from '../ui/SwatchGrid';
+import ToggleRow from '../ui/ToggleRow';
 import CutoutsEditor from './CutoutsEditor';
 import StorySceneEditor from './story/StorySceneEditor';
+
+const GHOST_BTN = 'grid h-9 w-9 place-items-center rounded-[10px] border border-white/[.12] bg-white/[.03] text-[13px] font-semibold text-[#c9cdd8] transition-colors duration-[.16s] hover:bg-white/[.08] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]';
+const DESTRUCTIVE_BTN = 'w-full rounded-[10px] border border-[#ff7a59]/[.28] bg-[#ff7a59]/[.07] px-4 py-2.5 text-[13.5px] font-semibold text-[#ff8f76] transition-colors duration-[.16s] hover:bg-[#ff7a59]/[.16] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]';
+
+const DUR_OPTIONS: Array<[string, string]> = DURS.map((d) => [String(d), `${d}s`]);
+const BG_SWATCHES = PRESETS.map((p, i) => ({ id: String(i), background: `linear-gradient(150deg, ${p.a}, ${p.b})`, label: p.name }));
 
 export default function SceneCard({ slide, index, count }: { slide: Slide; index: number; count: number }) {
   const project = useEditorStore((s) => s.project);
@@ -35,27 +45,31 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
   const { seek, playFrom } = usePlayback();
   const replaceInputRef = useRef<HTMLInputElement>(null);
 
+  const moveRow = (
+    <div className="flex justify-end gap-1.5">
+      <button disabled={index === 0} onClick={() => moveSlide(slide.id, -1)} aria-label="Move slide up" className={GHOST_BTN}>
+        ↑
+      </button>
+      <button disabled={index === count - 1} onClick={() => moveSlide(slide.id, 1)} aria-label="Move slide down" className={GHOST_BTN}>
+        ↓
+      </button>
+      <button onClick={() => duplicateSlide(slide.id)} aria-label="Duplicate slide" title="Duplicate" className={GHOST_BTN}>
+        ⧉
+      </button>
+    </div>
+  );
+
   if (slide.kind === 'story') {
     return (
-      <div className="mb-2.5 rounded-2xl bg-neutral-100 p-3 dark:bg-neutral-800/60">
-        <div className="mb-2.5 flex items-center justify-between gap-2">
-          <span className="text-[15px] font-extrabold whitespace-nowrap">Story slide {index + 1}</span>
-          <div className="flex flex-wrap justify-end gap-1">
-            <button disabled={index === 0} onClick={() => moveSlide(slide.id, -1)} aria-label="Move slide up" className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[12.5px] font-semibold disabled:opacity-35 dark:border-white/10 dark:bg-neutral-800">
-              ↑
-            </button>
-            <button disabled={index === count - 1} onClick={() => moveSlide(slide.id, 1)} aria-label="Move slide down" className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[12.5px] font-semibold disabled:opacity-35 dark:border-white/10 dark:bg-neutral-800">
-              ↓
-            </button>
-            <button onClick={() => duplicateSlide(slide.id)} className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[12.5px] font-semibold dark:border-white/10 dark:bg-neutral-800">
-              Duplicate
-            </button>
-            <button onClick={() => removeSlide(slide.id)} className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[12.5px] font-semibold text-red-600 dark:border-white/10 dark:bg-neutral-800">
-              Delete
-            </button>
-          </div>
+      <div className="grid grid-cols-1 gap-5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[13.5px] font-semibold text-[#f4f5f8]">Story slide {index + 1}</span>
+          {moveRow}
         </div>
         <StorySceneEditor slide={slide} />
+        <button onClick={() => removeSlide(slide.id)} className={DESTRUCTIVE_BTN}>
+          Delete slide
+        </button>
       </div>
     );
   }
@@ -64,7 +78,6 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
   const image = slide.kind === 'image' ? slide : null;
   const img = image?.imgAssetId ? assets.images[image.imgAssetId] : null;
   const pick = !isText && !!image && (image.anim === 'spotlight' || image.gesture !== 'none' || !!image.callout);
-  const style = resolveStyle(project, slide);
   const start = sceneStart(project, slide.id);
 
   const setF = <K extends keyof ClassicSlide>(key: K, value: ClassicSlide[K]) => updateSlide(slide.id, { [key]: value } as Partial<ClassicSlide>);
@@ -94,107 +107,94 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
   };
 
   return (
-    <div className="mb-2.5 rounded-2xl bg-neutral-100 p-3 dark:bg-neutral-800/60">
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <span className="font-[family-name:var(--font-display,inherit)] text-[15px] font-extrabold whitespace-nowrap">
+    <div className="grid grid-cols-1 gap-5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13.5px] font-semibold text-[#f4f5f8]">
           {isText ? 'Text slide' : 'Slide'} {index + 1}
         </span>
-        <div className="flex flex-wrap justify-end gap-1">
-          <button disabled={index === 0} onClick={() => moveSlide(slide.id, -1)} aria-label="Move slide up" className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[12.5px] font-semibold disabled:opacity-35 dark:border-white/10 dark:bg-neutral-800">
-            ↑
-          </button>
-          <button disabled={index === count - 1} onClick={() => moveSlide(slide.id, 1)} aria-label="Move slide down" className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[12.5px] font-semibold disabled:opacity-35 dark:border-white/10 dark:bg-neutral-800">
-            ↓
-          </button>
-          <button onClick={() => duplicateSlide(slide.id)} className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[12.5px] font-semibold dark:border-white/10 dark:bg-neutral-800">
-            Duplicate
-          </button>
-          <button onClick={() => removeSlide(slide.id)} className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[12.5px] font-semibold text-red-600 dark:border-white/10 dark:bg-neutral-800">
-            Delete
-          </button>
-        </div>
+        {moveRow}
       </div>
 
-      <div className="grid grid-cols-[auto_1fr] items-start gap-3.5">
-        {isText ? (
-          <div
-            onClick={onThumbClick}
-            style={{ background: `linear-gradient(150deg, ${style.colors.a}, ${style.colors.b})`, color: style.colors.text }}
-            className="grid h-[150px] w-[84px] cursor-pointer place-items-center rounded-xl text-3xl font-extrabold"
-          >
-            Aa
-          </div>
-        ) : (
-          <div onClick={onThumbClick} className={`relative inline-block overflow-hidden rounded-xl bg-black leading-none ${pick ? 'cursor-crosshair' : 'cursor-pointer'}`}>
-            {img ? (
-              // eslint-disable-next-line @next/next/no-img-element -- in-memory/data-URL asset, not a static/remote file Next's Image optimizer can handle
-              <img src={assetSrc(img)} alt={`Screenshot for slide ${index + 1}`} className="h-[150px] w-auto max-w-[90px] object-contain" />
-            ) : (
-              <div className="grid h-[150px] w-[84px] place-items-center text-xs text-neutral-400">No image</div>
-            )}
-            {pick && image && (
-              <span
-                style={{ left: `${image.focus.x * 100}%`, top: `${image.focus.y * 100}%` }}
-                className="pointer-events-none absolute h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[#FFD23F] shadow-[0_0_0_2px_rgba(0,0,0,.45)]"
-              />
-            )}
-          </div>
-        )}
+      {!isText && (
+        <div onClick={onThumbClick} className={`relative inline-block w-full overflow-hidden rounded-xl bg-black/40 leading-none ${pick ? 'cursor-crosshair' : 'cursor-pointer'}`}>
+          {img ? (
+            // eslint-disable-next-line @next/next/no-img-element -- in-memory/data-URL asset, not a static/remote file Next's Image optimizer can handle
+            <img src={assetSrc(img)} alt={`Screenshot for slide ${index + 1}`} className="mx-auto h-[140px] w-auto max-w-full object-contain" />
+          ) : (
+            <div className="grid h-[140px] place-items-center text-[12.5px] text-[#6d7484]">No image</div>
+          )}
+          {pick && image && (
+            <span
+              style={{ left: `${image.focus.x * 100}%`, top: `${image.focus.y * 100}%` }}
+              className="pointer-events-none absolute h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[#ffd166] shadow-[0_0_0_2px_rgba(0,0,0,.45)]"
+            />
+          )}
+        </div>
+      )}
 
-        <div className="grid min-w-0 gap-2.5">
-          <label className="block text-[12.5px] font-semibold text-neutral-500 dark:text-neutral-400">
-            Headline
-            <input
-              type="text"
-              value={slide.headline}
-              onChange={(e) => setF('headline', e.target.value)}
-              onFocus={() => seek(start + Math.min(2, slide.dur - 0.5))}
-              className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-            />
-          </label>
-          <label className="block text-[12.5px] font-semibold text-neutral-500 dark:text-neutral-400">
-            Subtitle
-            <input
-              type="text"
-              value={slide.sub}
-              placeholder="Optional"
-              onChange={(e) => setF('sub', e.target.value)}
-              onFocus={() => seek(start + Math.min(2, slide.dur - 0.5))}
-              className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-2.5">
-            <label className="block text-[12.5px] font-semibold text-neutral-500 dark:text-neutral-400">
-              Length
-              <select
-                value={slide.dur}
-                onChange={(e) => setF('dur', Number(e.target.value))}
-                className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-              >
-                {DURS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}s
-                  </option>
-                ))}
-              </select>
-            </label>
-            {!isText && (
-              <button onClick={() => replaceInputRef.current?.click()} className="self-end pb-2.5 text-left text-[13px] font-bold text-indigo-600 dark:text-indigo-400">
+      <label className="block">
+        <SectionLabel trailing={<span className="text-[11.5px] font-normal text-[#5f6675]">{index + 1} / 42</span>}>Headline</SectionLabel>
+        <input
+          type="text"
+          value={slide.headline}
+          onChange={(e) => setF('headline', e.target.value)}
+          onFocus={() => seek(start + Math.min(2, slide.dur - 0.5))}
+          className="block h-10 w-full rounded-[10px] border border-white/[.12] bg-white/[.03] px-3 text-[13.5px] text-[#f4f5f8] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]"
+        />
+      </label>
+
+      <label className="block">
+        <SectionLabel>Supporting line</SectionLabel>
+        <textarea
+          value={slide.sub}
+          placeholder="Optional"
+          rows={2}
+          onChange={(e) => setF('sub', e.target.value)}
+          onFocus={() => seek(start + Math.min(2, slide.dur - 0.5))}
+          className="block w-full resize-none rounded-[10px] border border-white/[.12] bg-white/[.03] px-3 py-2 text-[13.5px] text-[#f4f5f8] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]"
+        />
+      </label>
+
+      <div>
+        <SectionLabel>Length</SectionLabel>
+        <SegmentedControl scroll options={DUR_OPTIONS} value={String(slide.dur)} onChange={(v) => setF('dur', Number(v))} />
+      </div>
+
+      {!isText && (
+        <div>
+          <SectionLabel
+            trailing={
+              <button onClick={() => replaceInputRef.current?.click()} className="text-[12px] font-semibold text-[#8b7dff] hover:text-[#a89bff]">
                 Replace screenshot
               </button>
-            )}
-            <input ref={replaceInputRef} type="file" accept="image/*" className="hidden" onChange={onReplace} />
-          </div>
+            }
+          >
+            Background
+          </SectionLabel>
+          <SwatchGrid items={BG_SWATCHES} value={slide.style.theme ?? ''} onChange={(id) => setSlideStyle(slide.id, 'theme', id)} size={42} shape="rounded" />
+          <input ref={replaceInputRef} type="file" accept="image/*" className="hidden" onChange={onReplace} />
         </div>
-      </div>
+      )}
+      {isText && (
+        <div>
+          <SectionLabel>Background</SectionLabel>
+          <SwatchGrid items={BG_SWATCHES} value={slide.style.theme ?? ''} onChange={(id) => setSlideStyle(slide.id, 'theme', id)} size={42} shape="rounded" />
+        </div>
+      )}
+
+      {!isText && (
+        <ToggleRow title="Show phone frame" checked={slide.style.model !== 'card'} onChange={(v) => setSlideStyle(slide.id, 'model', v ? undefined : 'card')} />
+      )}
 
       <Details summary="Motion and effects">
-        {isText ? (
-          <TextEffectsFields slide={slide} setF={setF} lockedEffects={lockedEffects} />
-        ) : (
-          image && <ImageEffectsFields slide={image} pick={pick} setF={setF} lockedEffects={lockedEffects} />
-        )}
+        {isText ? <TextEffectsFields slide={slide} setF={setF} lockedEffects={lockedEffects} /> : image && <ImageEffectsFields slide={image} pick={pick} setF={setF} lockedEffects={lockedEffects} />}
       </Details>
+
+      {image && (
+        <Details summary={`3D pose${image.pose3d ? ' (on)' : ''}`}>
+          <Pose3DFields slide={image} setF={setF} />
+        </Details>
+      )}
 
       {image && (
         <Details summary={`Cutouts${image.cutouts.length ? ` (${image.cutouts.length})` : ''}`}>
@@ -219,6 +219,10 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
         onReset={() => resetSlideStyle(slide.id)}
         onApplyAll={() => applyStyleToAll(slide.id)}
       />
+
+      <button onClick={() => removeSlide(slide.id)} className={DESTRUCTIVE_BTN}>
+        Delete slide
+      </button>
     </div>
   );
 }
@@ -254,43 +258,22 @@ function ImageEffectsFields({
         </Field>
         {slide.effect === 'stickers' ? (
           <Field label="Stickers">
-            <input
-              type="text"
-              value={slide.stickers}
-              onChange={(e) => setF('stickers', e.target.value)}
-              placeholder="Up to 5 emoji"
-              className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-            />
+            <input type="text" value={slide.stickers} onChange={(e) => setF('stickers', e.target.value)} placeholder="Up to 5 emoji" className={INPUT_CLASS} />
           </Field>
         ) : (
           <span />
         )}
         <Field label="Callout">
-          <input
-            type="text"
-            value={slide.callout}
-            maxLength={28}
-            onChange={(e) => setF('callout', e.target.value)}
-            placeholder="Arrow label, e.g. Tap here"
-            className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-          />
+          <input type="text" value={slide.callout} maxLength={28} onChange={(e) => setF('callout', e.target.value)} placeholder="Arrow label, e.g. Tap here" className={INPUT_CLASS} />
         </Field>
         <Field label="Badge">
-          <input
-            type="text"
-            value={slide.badge}
-            maxLength={18}
-            onChange={(e) => setF('badge', e.target.value)}
-            placeholder="New, 4.9 ★, Free"
-            className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-          />
+          <input type="text" value={slide.badge} maxLength={18} onChange={(e) => setF('badge', e.target.value)} placeholder="New, 4.9 ★, Free" className={INPUT_CLASS} />
         </Field>
       </div>
-      <label className="mt-2.5 flex items-center gap-2 text-[13.5px] font-semibold">
-        <input type="checkbox" checked={slide.scroll} onChange={(e) => setF('scroll', e.target.checked)} className="h-[18px] w-[18px] accent-indigo-600" />
-        Scroll through a tall screenshot
-      </label>
-      {pick && <p className="mt-1.5 text-[12.5px] text-neutral-500 dark:text-neutral-400">Tap the screenshot to set where the zoom, gesture or callout points.</p>}
+      <div className="mt-2.5">
+        <ToggleRow title="Scroll through a tall screenshot" checked={slide.scroll} onChange={(v) => setF('scroll', v)} />
+      </div>
+      {pick && <p className="mt-1.5 text-[12px] text-[#767e8d]">Tap the screenshot to set where the zoom, gesture or callout points.</p>}
     </>
   );
 }
@@ -314,14 +297,70 @@ function TextEffectsFields({
       </Field>
       {slide.effect === 'stickers' && (
         <Field label="Stickers">
-          <input
-            type="text"
-            value={slide.stickers}
-            onChange={(e) => setF('stickers', e.target.value)}
-            placeholder="Up to 5 emoji"
-            className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-          />
+          <input type="text" value={slide.stickers} onChange={(e) => setF('stickers', e.target.value)} placeholder="Up to 5 emoji" className={INPUT_CLASS} />
         </Field>
+      )}
+    </div>
+  );
+}
+
+const POSE_PRESET_ENTRIES = Object.entries(POSE_PRESETS) as Array<[PosePresetKey, (typeof POSE_PRESETS)[PosePresetKey]]>;
+
+/** 3D device pose — see src/engine/pose3d.ts and drawDevice3D in
+ * src/engine/devices.ts. `pose3d: null` (the default) means "flat, exactly
+ * like every other slide" — picking any preset here is what turns the 3D
+ * renderer on for this slide; "Reset to flat" turns it back off entirely,
+ * rather than just resetting to the Front preset's numbers. */
+function Pose3DFields({ slide, setF }: { slide: ImageSlide; setF: <K extends keyof ClassicSlide>(key: K, value: ClassicSlide[K]) => void }) {
+  const pose = slide.pose3d;
+  const setPose = (partial: Partial<Pose3D>) => {
+    if (!pose) return;
+    setF('pose3d', { ...pose, ...partial });
+  };
+
+  return (
+    <div className="grid gap-2.5">
+      <div className="grid grid-cols-4 gap-1.5">
+        {POSE_PRESET_ENTRIES.map(([key, preset]) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={!!pose && pose.rx === preset.rx && pose.ry === preset.ry && pose.rz === preset.rz && pose.distance === preset.distance && pose.scale === preset.scale}
+            onClick={() => setF('pose3d', { rx: preset.rx, ry: preset.ry, rz: preset.rz, distance: preset.distance, scale: preset.scale })}
+            className="rounded-[10px] border border-white/[.12] bg-white/[.03] px-1.5 py-2 text-[11.5px] font-semibold text-[#c9cdd8] transition-colors duration-[.16s] hover:bg-white/[.08] aria-pressed:border-[#8b7dff]/60 aria-pressed:bg-[#5b4bff]/[.18] aria-pressed:text-[#cfc8ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]"
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
+      {pose && (
+        <>
+          <Field label="Motion">
+            <Select value={slide.motion3d} onChange={(v) => setF('motion3d', v as ImageSlide['motion3d'])} options={MOTION3D} />
+          </Field>
+
+          <Details summary="Advanced (manual pose)">
+            <div className="grid gap-2.5">
+              <RangeInput min={-60} max={60} step={0.5} value={pose.rx} onChange={(v) => setPose({ rx: v })} label="Rotate X" valueLabel={`${Math.round(pose.rx)}°`} />
+              <RangeInput min={-180} max={180} step={0.5} value={pose.ry} onChange={(v) => setPose({ ry: v })} label="Rotate Y" valueLabel={`${Math.round(pose.ry)}°`} />
+              <RangeInput min={-45} max={45} step={0.5} value={pose.rz} onChange={(v) => setPose({ rz: v })} label="Rotate Z" valueLabel={`${Math.round(pose.rz)}°`} />
+              <RangeInput min={900} max={6000} step={10} value={pose.distance} onChange={(v) => setPose({ distance: v })} label="Perspective" valueLabel={Math.round(pose.distance)} />
+              <RangeInput min={0.5} max={1.6} step={0.01} value={pose.scale} onChange={(v) => setPose({ scale: v })} label="Scale" valueLabel={`${pose.scale.toFixed(2)}×`} />
+            </div>
+          </Details>
+
+          <button
+            type="button"
+            onClick={() => {
+              setF('pose3d', null);
+              setF('motion3d', 'none');
+            }}
+            className="text-left text-[12px] font-semibold text-[#8b7dff] hover:text-[#a89bff]"
+          >
+            Reset to flat (turn off 3D pose)
+          </button>
+        </>
       )}
     </div>
   );
@@ -353,10 +392,7 @@ function CounterEditor({ slide, setF }: { slide: ImageSlide; setF: <K extends ke
 
   return (
     <div className="grid gap-2.5">
-      <label className="flex items-center gap-2 text-[13.5px] font-semibold">
-        <input type="checkbox" checked={!!counter} onChange={(e) => setF('counter', e.target.checked ? DEFAULT_COUNTER : null)} className="h-[18px] w-[18px] accent-indigo-600" />
-        Add an animated count-up number
-      </label>
+      <ToggleRow title="Add an animated count-up number" checked={!!counter} onChange={(v) => setF('counter', v ? DEFAULT_COUNTER : null)} />
       {counter && (
         <>
           <div className="grid grid-cols-2 gap-2.5">
@@ -371,13 +407,7 @@ function CounterEditor({ slide, setF }: { slide: ImageSlide; setF: <K extends ke
             </Field>
             {counter.format === 'currency' ? (
               <Field label="Symbol">
-                <input
-                  type="text"
-                  value={counter.currencySymbol}
-                  maxLength={3}
-                  onChange={(e) => patch({ currencySymbol: e.target.value })}
-                  className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-                />
+                <input type="text" value={counter.currencySymbol} maxLength={3} onChange={(e) => patch({ currencySymbol: e.target.value })} className={INPUT_CLASS} />
               </Field>
             ) : (
               <span />
@@ -401,8 +431,8 @@ function CounterEditor({ slide, setF }: { slide: ImageSlide; setF: <K extends ke
               <NumberInput value={counter.y} min={0} max={1} step={0.01} onChange={(v) => patch({ y: v })} />
             </Field>
           </div>
-          <p className="text-[12.5px] text-neutral-500 dark:text-neutral-400">
-            Preview: <b>{formatPreview(counter)}</b>
+          <p className="text-[12px] text-[#767e8d]">
+            Preview: <b className="text-[#c9cdd8]">{formatPreview(counter)}</b>
           </p>
         </>
       )}
@@ -418,6 +448,8 @@ function formatPreview(counter: CounterConfig): string {
   return num;
 }
 
+const INPUT_CLASS = 'mt-1 block h-10 w-full rounded-[10px] border border-white/[.12] bg-white/[.03] px-3 text-[13.5px] text-[#f4f5f8] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]';
+
 function NumberInput({ value, onChange, min, max, step = 1 }: { value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
   return (
     <input
@@ -430,14 +462,14 @@ function NumberInput({ value, onChange, min, max, step = 1 }: { value: number; o
         const v = Number(e.target.value);
         if (!Number.isNaN(v)) onChange(v);
       }}
-      className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
+      className={INPUT_CLASS}
     />
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block text-[12.5px] font-semibold text-neutral-500 dark:text-neutral-400">
+    <label className="block text-[12px] font-semibold text-[#767e8d]">
       {label}
       {children}
     </label>
@@ -446,15 +478,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Select<T extends string>({ value, onChange, options, disabledValues }: { value: T; onChange: (v: T) => void; options: Array<[T, string]>; disabledValues?: Set<T> }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as T)}
-      className="mt-1 block w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[14.5px] dark:border-white/10 dark:bg-neutral-800"
-    >
+    <select value={value} onChange={(e) => onChange(e.target.value as T)} className={`${INPUT_CLASS} appearance-none`}>
       {options.map(([v, label]) => {
         const locked = disabledValues?.has(v);
         return (
-          <option key={v} value={v} disabled={locked}>
+          <option key={v} value={v} disabled={locked} className="bg-[#11131a] text-[#f4f5f8]">
             {label}
             {locked ? ' (Pro)' : ''}
           </option>

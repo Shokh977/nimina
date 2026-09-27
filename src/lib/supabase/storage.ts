@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { loadImageFromUrl } from '@/lib/assetSrc';
+import { collectImageAssetIds } from '@/engine/project';
+import type { AssetMap, Project } from '@/engine/types';
+
 const BUCKET = 'assets';
 
 /** Storage paths are {user_id}/{project_id}/{asset_id} — the JSON project
@@ -28,6 +32,27 @@ export async function getSignedAssetUrl(supabase: SupabaseClient, projectId: str
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresIn);
   if (error) throw error;
   return data.signedUrl;
+}
+
+/** Loads every real uploaded image a project's scenes reference (best
+ * effort — an id with no real upload yet is simply left out of the
+ * returned map, not an error). Shared by useTemplatePersistence.ts
+ * (overriding placeholders once hydrated) and
+ * TemplatePreviewRegenerator.tsx (rendering a preview from whatever the
+ * admin has actually uploaded, not just a code-defined procedural sample). */
+export async function loadProjectImageAssets(supabase: SupabaseClient, projectId: string, project: Project): Promise<AssetMap> {
+  const assets: AssetMap = {};
+  await Promise.all(
+    [...collectImageAssetIds(project)].map(async (assetId) => {
+      try {
+        const url = await getSignedAssetUrl(supabase, projectId, assetId);
+        assets[assetId] = await loadImageFromUrl(url);
+      } catch {
+        // no real upload for this asset id yet
+      }
+    }),
+  );
+  return assets;
 }
 
 export async function uploadThumbnail(supabase: SupabaseClient, projectId: string, blob: Blob): Promise<string> {

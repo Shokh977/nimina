@@ -372,6 +372,7 @@ function buildScenes(strings: FitnessStrings, variant: 'full' | 'short'): { scen
       { actionId: 'a5', target: { x: 0.5, y: 0.798 }, zoom: 1.18 },
       { actionId: 'a6', target: { x: 0.5, y: 0.5 }, zoom: 1 },
     ],
+    hidden: false,
   };
   slots.push({ key: 'today', label: 'Today (tall)', hint: "Today's workout list — the scroll/tap beat needs real overflow", targets: [{ sceneId: storySlide.id, screenId: 'today' }] });
 
@@ -458,6 +459,7 @@ export const FITNESS_TEMPLATE: TemplateDef = {
       music: null,
       volume: 0.8,
       ducking: true,
+      motionSpeed: 100,
       scenes,
     };
     return { project, slots };

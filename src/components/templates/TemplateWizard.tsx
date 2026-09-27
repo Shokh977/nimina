@@ -1,14 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { getTemplate } from '@/engine/templates';
 import type { Slide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { createClient } from '@/lib/supabase/client';
 import { createProjectFromTemplate } from '@/lib/supabase/projects';
 import { uploadAsset } from '@/lib/supabase/storage';
+import { getTemplateForWizard, type TemplateWithPreview } from '@/lib/supabase/templates';
 
 /** Modal wizard: shows the template's screenshot "slots", lets the user
  * fill in as many as they want (any left empty are just blank slides/
@@ -22,14 +22,33 @@ import { uploadAsset } from '@/lib/supabase/storage';
  * slide is one slot, uploaded once, applied to both. */
 export default function TemplateWizard({ templateId, onClose }: { templateId: string; onClose: () => void }) {
   const router = useRouter();
-  const template = useMemo(() => getTemplate(templateId), [templateId]);
-  const built = useMemo(() => template?.build(), [template]);
+  const [template, setTemplate] = useState<TemplateWithPreview | null | undefined>(undefined);
   const [files, setFiles] = useState<Record<string, File>>({});
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  if (!template || !built) return null;
+  useEffect(() => {
+    let cancelled = false;
+    getTemplateForWizard(createClient(), templateId).then((t) => {
+      if (!cancelled) setTemplate(t);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [templateId]);
+
+  if (template === undefined) {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onClose}>
+        <div onClick={(e) => e.stopPropagation()} className="rounded-2xl bg-white p-5 text-[13.5px] font-semibold dark:bg-neutral-900">
+          Loading…
+        </div>
+      </div>
+    );
+  }
+  if (template === null) return null;
+  const built = template.build();
   const { project, slots } = built;
 
   const onFile = async (slotKey: string, file: File | undefined) => {

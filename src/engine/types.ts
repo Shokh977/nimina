@@ -1,5 +1,5 @@
 /**
- * Data model for the Promo Studio rendering engine.
+ * Data model for the Nimina rendering engine.
  *
  * This module has no React/Next.js/DOM-framework dependencies. It describes
  * the shape of a "Project" (the full editable state of a promo video) and
@@ -21,13 +21,15 @@ export type FrameColorId = 'graphite' | 'silver' | 'titanium' | 'midnight' | 'ro
 export type SlideAnim = 'rise' | 'pop' | 'slide' | 'swing' | 'spotlight';
 export type Camera = 'none' | 'push' | 'pull' | 'drift' | 'shake';
 export type Gesture = 'none' | 'tap' | 'swipeUp' | 'swipeLeft';
+export type Motion3DKey = 'none' | 'turntable' | 'swing' | 'flip' | 'unfold' | 'handheld' | 'orbit';
+export type PosePresetKey = 'front' | 'threeQL' | 'threeQR' | 'hero' | 'flat' | 'floating';
 export type SlideLayout = 'single' | 'fan';
 export type Effect = 'none' | 'confetti' | 'sparkles' | 'stickers';
 export type TextAnim = 'rise' | 'pop' | 'type' | 'slide' | 'letters';
 export type HlStyle = 'marker' | 'color' | 'underline';
 export type Transition = 'none' | 'wipe' | 'flash' | 'iris' | 'bars';
 export type BgPattern = 'glow' | 'grid' | 'dots' | 'rays' | 'waves';
-export type TextPos = 'top' | 'bottom';
+export type TextPos = 'top' | 'bottom' | 'center';
 export type Quality = '720' | '1080' | '2160';
 
 /* ---------- assets ---------- */
@@ -81,6 +83,11 @@ export interface ModelDef {
   /** screen corner radius, as a fraction of width */
   sr: number;
   cut: FrameCut;
+  /** Device thickness (depth, front-to-back) as a fraction of width — only
+   * used by the 3D pose renderer (src/engine/pose3d.ts, drawDevice3D in
+   * devices.ts). The flat 2D renderer has no notion of depth, so this is
+   * additive and doesn't affect drawDevice(). */
+  t3d: number;
 }
 
 export interface FrameColorDef {
@@ -197,6 +204,19 @@ export interface CounterConfig {
   y: number;
 }
 
+/** A device's 3D pose — rotation in degrees around each axis, camera
+ * distance, and an overall scale multiplier. Local-space units match the
+ * device's own PW/PH (device-local pixels before drawScene's own S
+ * scale), so `distance` is comparable to PW/PH, not canvas pixels. See
+ * src/engine/pose3d.ts. */
+export interface Pose3D {
+  rx: number;
+  ry: number;
+  rz: number;
+  distance: number;
+  scale: number;
+}
+
 interface SlideBase {
   id: number;
   headline: string;
@@ -212,6 +232,15 @@ interface SlideBase {
   callout: string;
   camera: Camera;
   effect: Effect;
+  /** null = classic flat 2D device rendering (the default for every
+   * existing and newly created slide) — drawScene skips the 3D code path
+   * entirely in that case. Non-null engages drawDevice3D
+   * (src/engine/devices.ts) with this as the resting pose, further
+   * animated per-frame by `motion3d` (src/engine/pose3d.ts's
+   * resolveMotion3d). Meaningless on TextSlide (no device) — present only
+   * because SlideBase is shared, same as gesture/badge/callout. */
+  pose3d: Pose3D | null;
+  motion3d: Motion3DKey;
   /** up to 5 graphemes, used when effect === 'stickers' */
   stickers: string;
   /** scroll through a tall screenshot instead of holding still */
@@ -225,6 +254,10 @@ interface SlideBase {
    * badge/callout, since there's no single scalar default that means off. */
   counter: CounterConfig | null;
   style: SlideStyle;
+  /** Excluded from the timeline (getTimeline skips it entirely — no
+   * segment, doesn't count toward total duration, never drawn/exported)
+   * while staying in the editor's slide list, dimmed. */
+  hidden: boolean;
 }
 
 export interface ImageSlide extends SlideBase {
@@ -358,6 +391,9 @@ export interface StorySlide {
   cameraMode: 'auto' | 'manual';
   /** Only used when cameraMode === 'manual'. */
   cameraKeys: CameraKey[];
+  /** Same semantics as SlideBase.hidden — StorySlide doesn't extend
+   * SlideBase, so it needs its own copy of the field. */
+  hidden: boolean;
 }
 
 export type Slide = ImageSlide | TextSlide | StorySlide;
@@ -420,6 +456,11 @@ export interface Project {
   /** Whether background music ducks (briefly lowers) under story-slide
    * sound effects during preview and export. */
   ducking: boolean;
+  /** Global playback-speed multiplier as a percentage (100 = 1.0x, range
+   * 60-160) — divides every segment's duration in getTimeline(), so it
+   * propagates to live preview, the filmstrip and real export from that
+   * one source. */
+  motionSpeed: number;
 }
 
 /* ---------- timeline ---------- */

@@ -22,5 +22,5 @@ export default async function EditorPage(props: PageProps<'/editor/[id]'>) {
   const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle();
   const plan: Plan = profile?.plan === 'pro' ? 'pro' : 'free';
 
-  return <EditorShell userEmail={user.email ?? ''} projectId={project.id} initialProject={project.data} plan={plan} />;
+  return <EditorShell userEmail={user.email ?? ''} projectId={project.id} projectName={project.name} initialProject={project.data} plan={plan} />;
 }

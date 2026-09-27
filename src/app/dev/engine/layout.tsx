@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Engine dev — Promo Studio',
+  title: 'Engine dev — Nimina',
 };
 
 /**

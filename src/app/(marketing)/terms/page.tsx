@@ -9,14 +9,14 @@ export default function TermsPage() {
     <LegalPage title="Terms of Service">
       <LegalSection title="Agreement">
         <p>
-          These terms govern your use of Promo Studio, operated by [your legal name / company name]. By creating an account or using the product, you agree to these terms. If you
+          These terms govern your use of Nimina, operated by [your legal name / company name]. By creating an account or using the product, you agree to these terms. If you
           don&apos;t agree, don&apos;t use the product.
         </p>
       </LegalSection>
 
       <LegalSection title="The service">
         <p>
-          Promo Studio lets you upload app screenshots and generate an animated promotional video, which you can export as a video file. Free accounts are limited to 1 saved
+          Nimina lets you upload app screenshots and generate an animated promotional video, which you can export as a video file. Free accounts are limited to 1 saved
           project, exports up to 720p, and include a watermark; paid Pro accounts remove these limits as described on the [pricing page].
         </p>
       </LegalSection>

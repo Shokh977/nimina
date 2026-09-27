@@ -7,6 +7,9 @@ import { createClient } from '@/lib/supabase/server';
 const NAV = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/users', label: 'Users' },
+  { href: '/admin/templates', label: 'Templates' },
+  { href: '/admin/homepage', label: 'Homepage' },
+  { href: '/admin/pricing', label: 'Pricing' },
   { href: '/admin/content', label: 'Content' },
 ];
 
@@ -29,7 +32,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4 px-3 py-4 sm:px-6">
           <div className="flex items-baseline gap-6">
             <Link href="/projects" className="text-lg font-bold hover:underline">
-              Promo Studio
+              Nimina
             </Link>
             <nav className="flex gap-4">
               {NAV.map((n) => (

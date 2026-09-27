@@ -5,9 +5,10 @@
  * drawBadge/drawCallout.
  */
 import { FCOLORS, MODELS } from './constants';
+import { DEG, drawTexturedQuad3d, frontPoseScale, isFrontPose, pathFrom3d, roundRectPoints3d, rotate3d, xform3d, type Point2, type Point3 } from './pose3d';
 import { resolveEasing } from './story/easing';
-import type { CounterConfig, FontDef, FrameColorId, FrameColorResolved, ImageAsset, ImgRect, ModelKey, ResolvedStyle, ScreenBox, ImageSlide } from './types';
-import { clamp, cover, easeInOutCubic, easeOutBack, easeOutCubic, fontStr, imgH, imgW, rgba, rr, shade, slug } from './utils';
+import type { CounterConfig, FontDef, FrameColorId, FrameColorResolved, ImageAsset, ImgRect, ModelKey, Pose3D, ResolvedStyle, ScreenBox, ImageSlide } from './types';
+import { clamp, cover, easeInOutCubic, easeOutBack, easeOutCubic, fontStr, hexRGB, imgH, imgW, rgba, rr, shade, slug } from './utils';
 
 export function screenBox(PW: number, PH: number, model: ModelKey) {
   const m = MODELS[model];
@@ -217,6 +218,269 @@ export function drawDevice(
     ctx.beginPath();
     ctx.arc(0, -PH / 2 + (sb.y + PH / 2) / 2, PW * 0.009, 0, Math.PI * 2);
     ctx.fill();
+  }
+}
+
+/** Normalized-ish light direction for the 3D pose renderer's side-band
+ * shading — ported from legacy/device-3d-lab-download.html's LIGHT. */
+const LIGHT3D = { x: -0.45, y: -0.75, z: 0.5 };
+
+/** Fixed screen-texture mesh subdivision for this milestone — adaptive
+ * density (lower for preview, higher for export) is deferred. Higher than
+ * the prototype's own default (16) because each triangle's affine
+ * approximation of the true perspective only agrees exactly with its
+ * neighbors at shared vertices, not along the whole shared edge — visible
+ * as a faint crosshatch seam pattern across the screen at strong tilts
+ * when the mesh is too coarse. A finer mesh shrinks that per-edge
+ * disagreement below visibility. */
+const TEXTURE_SUBDIV = 16;
+
+function mixHex(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = hexRGB(a);
+  const [br, bg, bb] = hexRGB(b);
+  return `rgb(${Math.round(ar + (br - ar) * t)},${Math.round(ag + (bg - ag) * t)},${Math.round(ab + (bb - ab) * t)})`;
+}
+
+function shadeForNormal(nx: number, ny: number, nz: number, dark: string, edge: string): string {
+  const len = Math.hypot(nx, ny, nz) || 1;
+  const d = (nx * LIGHT3D.x + ny * LIGHT3D.y + nz * LIGHT3D.z) / len;
+  const k = clamp(0.35 + d * 0.75, 0, 1);
+  return mixHex(dark, edge, k);
+}
+
+/** Projects a device-local point ring (z fixed) through the pose and
+ * builds a ctx path from it — the 3D-renderer's equivalent of `rr()`,
+ * used everywhere a flat rounded-rect/notch shape needs to become a
+ * projected polygon instead. */
+function projectedPath(ctx: CanvasRenderingContext2D, pts: Point3[], pose: Pose3D): void {
+  pathFrom3d(ctx, pts.map((p) => xform3d(p, pose)));
+}
+
+/** Perspective device-frame rendering — pose/motion "steps 1-3" of the 3D
+ * device pose feature. Invoked from drawScene only when a slide has a
+ * non-null `pose3d`; the classic drawDevice() above is completely
+ * untouched and remains the path every existing/default scene uses.
+ * Structure ported from legacy/device-3d-lab-download.html's drawDevice(),
+ * adapted to this engine's MODELS/FCOLORS/screenBox rather than the
+ * prototype's own smaller model/color tables. */
+export function drawDevice3D(ctx: CanvasRenderingContext2D, img: ImageAsset | null, PW: number, PH: number, style: ResolvedStyle, appName: string, scroll: number, pose: Pose3D): void {
+  const m = MODELS[style.model];
+  const hz = (PW * m.t3d) / 2;
+
+  if (isFrontPose(pose)) {
+    const k = frontPoseScale(pose, hz);
+    ctx.save();
+    ctx.scale(k, k);
+    drawDevice(ctx, img, PW, PH, style, appName, scroll);
+    ctx.restore();
+    return;
+  }
+
+  const fc = frameColor(style.fcolor, style.colors.accent);
+  const sb = screenBox(PW, PH, style.model);
+  const bodyR = PW * m.r;
+  const colDark = shade(fc.body, -0.45);
+
+  const nFront = rotate3d({ x: 0, y: 0, z: 1 }, pose.rx, pose.ry, pose.rz);
+  const facing = nFront.z > 0;
+
+  const front3 = roundRectPoints3d(PW, PH, bodyR, hz);
+  const back3 = roundRectPoints3d(PW, PH, bodyR, -hz);
+  const pf: Point2[] = front3.map((p) => xform3d(p, pose));
+  const pb: Point2[] = back3.map((p) => xform3d(p, pose));
+
+  // Contact shadow: the front ring, flattened toward a ground plane behind
+  // the device and blurred — direct port of the prototype's shadow.
+  ctx.save();
+  ctx.globalAlpha *= 0.5;
+  const lift = 0.5 + Math.abs(Math.sin(pose.ry * DEG)) * 0.35;
+  const shadowPts = pf.map((p) => ({ x: p.x + Math.sin(pose.ry * DEG) * PW * 0.06, y: p.y + PH * 0.04 + PH * 0.026 * lift }));
+  ctx.filter = `blur(${Math.max(1, PW * 0.023 * lift)}px)`;
+  pathFrom3d(ctx, shadowPts);
+  ctx.fillStyle = 'rgba(8,10,24,.55)';
+  ctx.fill();
+  ctx.filter = 'none';
+  ctx.restore();
+
+  // Back shell base — only the sliver that peeks out past the side band
+  // and (when !facing) the whole visible back plate itself stays visible;
+  // drawn first so everything else layers on top.
+  ctx.save();
+  pathFrom3d(ctx, pb);
+  ctx.fillStyle = mixHex(colDark, fc.body, 0.5);
+  ctx.fill();
+  ctx.restore();
+
+  // Side band: one quad per outline segment, shaded by its own local
+  // normal, back-face culled by signed area — direct port.
+  for (let i = 0; i < front3.length; i++) {
+    const j = (i + 1) % front3.length;
+    const a = pf[i],
+      b = pf[j],
+      c = pb[j],
+      d = pb[i];
+    const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    if ((facing && area < 0) || (!facing && area > 0)) continue;
+    const mid = rotate3d({ x: (front3[j].x + front3[i].x) / 2, y: (front3[j].y + front3[i].y) / 2, z: 0 }, pose.rx, pose.ry, pose.rz);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.lineTo(c.x, c.y);
+    ctx.lineTo(d.x, d.y);
+    ctx.closePath();
+    ctx.fillStyle = shadeForNormal(mid.x, mid.y, mid.z, colDark, fc.edge);
+    ctx.fill();
+  }
+
+  if (!facing) {
+    // Back of the device: plain shell, no screen. Phone-shaped cuts get a
+    // small camera island (matching the classic front cutouts' emphasis
+    // on the camera system); browser/card/tablet — which have no physical
+    // "back" concept in the flat 2D renderer either — get a plain shell
+    // only.
+    if (m.cut === 'island' || m.cut === 'notch' || m.cut === 'punch') {
+      const camPts = roundRectPoints3d(PW * 0.32, PW * 0.32, PW * 0.09, hz).map((p) => xform3d({ x: p.x - PW * 0.22, y: p.y - PH * 0.32, z: p.z }, pose));
+      ctx.save();
+      pathFrom3d(ctx, camPts);
+      ctx.fillStyle = mixHex(colDark, '#000000', 0.35);
+      ctx.fill();
+      ctx.restore();
+      [
+        [-0.3, -0.37],
+        [-0.14, -0.37],
+        [-0.22, -0.26],
+      ].forEach(([fx, fy]) => {
+        const lensPts = roundRectPoints3d(PW * 0.11, PW * 0.11, PW * 0.055, hz + 0.6).map((p) => xform3d({ x: p.x + PW * fx, y: p.y + PH * fy, z: p.z }, pose));
+        ctx.save();
+        pathFrom3d(ctx, lensPts);
+        ctx.fillStyle = '#0B0D12';
+        ctx.fill();
+        ctx.lineWidth = Math.max(1, PW * 0.005);
+        ctx.strokeStyle = 'rgba(255,255,255,.22)';
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+    return;
+  }
+
+  // Front face: body plate + edge, glass insert, screen, cutout/chrome,
+  // sheen — mirrors the classic drawDevice's per-cut branches, but every
+  // shape is a projected point ring instead of a flat `rr()`/`arc()` call.
+  // Screen box geometry is unchanged (screenBox() above) — only its ring
+  // gets projected; sb.x/sb.y offset the local quad center passed to
+  // drawTexturedQuad3d rather than being pre-added into a flat rect.
+  const hasGlass = m.cut !== 'none' && m.cut !== 'browser';
+  const screenCx = sb.x + sb.w / 2,
+    screenCy = sb.y + sb.h / 2;
+
+  ctx.save();
+  projectedPath(ctx, front3, pose);
+  ctx.fillStyle = m.cut === 'browser' ? fc.chrome : m.cut === 'none' ? '#000' : fc.body;
+  ctx.fill();
+  if (m.cut !== 'none') {
+    ctx.lineWidth = Math.max(1, PW * 0.005 * nFront.z);
+    ctx.strokeStyle = fc.edge;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  if (hasGlass) {
+    const glass3 = roundRectPoints3d(PW - PW * m.bez * 1.2, PH - PW * m.bez * 1.2, PW * m.sr - PW * m.bez * 0.6, hz + 0.4);
+    ctx.save();
+    projectedPath(ctx, glass3, pose);
+    ctx.fillStyle = '#05050A';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const screen3 = roundRectPoints3d(sb.w, sb.h, sb.r, hz + 0.6);
+  ctx.save();
+  projectedPath(
+    ctx,
+    screen3.map((p) => ({ x: p.x + screenCx, y: p.y + screenCy, z: p.z })),
+    pose,
+  );
+  ctx.clip();
+  ctx.fillStyle = '#0B0B0E';
+  ctx.fillRect(-PW, -PH, PW * 2, PH * 2);
+  if (img) drawTexturedQuad3d(ctx, img, sb.w, sb.h, hz + 0.6, pose, TEXTURE_SUBDIV, screenCx, screenCy);
+  ctx.restore();
+
+  if (m.cut === 'browser') {
+    const bar = sb.bar ?? PH * 0.085,
+      barCy = -PH / 2 + bar / 2;
+    ['#FF5F57', '#FEBC2E', '#28C840'].forEach((col, i) => {
+      const p = xform3d({ x: -PW / 2 + bar * 0.5 + i * bar * 0.12 * 3.2, y: barCy, z: hz + 1 }, pose);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, bar * 0.12 * p.s, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+    });
+    const pillPts = roundRectPoints3d(PW * 0.42, bar * 0.54, bar * 0.27, hz + 1).map((p) => xform3d({ x: p.x, y: p.y + barCy, z: p.z }, pose));
+    ctx.save();
+    pathFrom3d(ctx, pillPts);
+    ctx.fillStyle = rgba(fc.chromeInk, 0.14);
+    ctx.fill();
+    ctx.restore();
+    const namePt = xform3d({ x: 0, y: barCy, z: hz + 1 }, pose);
+    ctx.save();
+    ctx.fillStyle = fc.chromeInk;
+    ctx.font = `600 ${bar * 0.3 * namePt.s}px Figtree, system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(slug(appName) + '.app', namePt.x, namePt.y);
+    ctx.restore();
+  } else if (m.cut === 'island') {
+    // Sits a bit lower than the classic 2D renderer's own island position
+    // (sb.y + PW*0.038) — 3D-pose-only per explicit user feedback, so it
+    // reads as level with a status bar's time/signal/battery row instead
+    // of floating right at the screen's top edge. Classic drawDevice()
+    // above is intentionally untouched (see its own "deliberate deviation"
+    // comment on why it's tuned where it is).
+    const pts = roundRectPoints3d(PW * 0.3, PW * 0.065, PW * 0.0325, hz + 1).map((p) => xform3d({ x: p.x, y: p.y + sb.y + PW * 0.058, z: p.z }, pose));
+    ctx.fillStyle = '#000';
+    pathFrom3d(ctx, pts);
+    ctx.fill();
+  } else if (m.cut === 'notch') {
+    // Same treatment as 'island' above, same reasoning.
+    const pts = roundRectPoints3d(PW * 0.5, PW * 0.07, PW * 0.03, hz + 1).map((p) => xform3d({ x: p.x, y: p.y + sb.y + PW * 0.055, z: p.z }, pose));
+    ctx.fillStyle = '#000';
+    pathFrom3d(ctx, pts);
+    ctx.fill();
+  } else if (m.cut === 'punch') {
+    const pts = roundRectPoints3d(PW * 0.052, PW * 0.052, PW * 0.026, hz + 1).map((p) => xform3d({ x: p.x, y: p.y + sb.y + PW * 0.05, z: p.z }, pose));
+    ctx.fillStyle = '#000';
+    pathFrom3d(ctx, pts);
+    ctx.fill();
+  } else if (m.cut === 'cam') {
+    const pts = roundRectPoints3d(PW * 0.018, PW * 0.018, PW * 0.009, hz + 1).map((p) => xform3d({ x: p.x, y: p.y - PH / 2 + (sb.y + PH / 2) / 2, z: p.z }, pose));
+    ctx.fillStyle = '#000';
+    pathFrom3d(ctx, pts);
+    ctx.fill();
+  }
+
+  // Glass sheen: a bright band sweeping across as yaw changes — new for
+  // the 3D pose renderer (the classic 2D drawDevice has no equivalent),
+  // ported from the prototype per the user's explicit "pose-driven
+  // lighting" ask.
+  if (hasGlass) {
+    const glass3 = roundRectPoints3d(PW - PW * m.bez * 1.2, PH - PW * m.bez * 1.2, PW * m.sr - PW * m.bez * 0.6, hz + 0.4);
+    ctx.save();
+    projectedPath(ctx, glass3, pose);
+    ctx.clip();
+    const a = xform3d({ x: -PW, y: -PH / 2, z: hz + 1 }, pose),
+      b = xform3d({ x: PW, y: PH / 2, z: hz + 1 }, pose);
+    const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+    const yr = pose.ry * DEG;
+    const pos = clamp(0.5 + Math.sin(yr) * 0.8, 0.02, 0.98);
+    const str = 0.05 + Math.abs(Math.sin(yr)) * 0.22;
+    g.addColorStop(Math.max(0, pos - 0.22), 'rgba(255,255,255,0)');
+    g.addColorStop(pos, `rgba(255,255,255,${str})`);
+    g.addColorStop(Math.min(1, pos + 0.22), 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.restore();
   }
 }
 

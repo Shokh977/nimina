@@ -1,5 +1,5 @@
 /**
- * Editor state for Promo Studio, built on Zustand.
+ * Editor state for Nimina, built on Zustand.
  *
  * `project` is the JSON-safe, database-persistable half of the state — it
  * matches src/engine's `Project` type exactly and never holds a DOM/decoded
@@ -16,7 +16,7 @@
 import { create } from 'zustand';
 
 import { PRESETS } from '@/engine/constants';
-import { createDefaultProject } from '@/engine/project';
+import { createDefaultProject, normalizeProject } from '@/engine/project';
 import { createImageSlide, createTextSlide } from '@/engine/slides';
 import type {
   Action,
@@ -72,6 +72,13 @@ interface EditorState {
   /** Replaces the whole project (e.g. loading a saved one) and resets history. */
   loadProject: (project: Project, projectId: string | null, assets?: Partial<EditorAssets>) => void;
 
+  /** Which slide the rail/filmstrip/Slide-tab are showing — independent of
+   * playback position (the playhead can sit inside one slide while a
+   * different one is open for editing). null only when there are no
+   * scenes and intro is off. */
+  selectedSceneId: number | 'intro' | 'outro' | null;
+  selectScene: (id: number | 'intro' | 'outro') => void;
+
   /* ---- global (Look/Motion) defaults ---- */
   setFormat: (format: Project['format']) => void;
   setQuality: (quality: Project['quality']) => void;
@@ -90,6 +97,7 @@ interface EditorState {
   setTextPos: (v: Project['textPos']) => void;
   setTextAnim: (v: Project['textAnim']) => void;
   setTransition: (v: Project['transition']) => void;
+  setMotionSpeed: (v: number) => void;
 
   /* ---- intro / outro ---- */
   setIntro: (patch: Partial<Omit<IntroConfig, 'style'>>) => void;
@@ -168,6 +176,13 @@ function resetHistory(project: Project) {
 
 function maxSlideId(project: Project): number {
   return project.scenes.reduce((m, s) => Math.max(m, s.id), 0);
+}
+
+function defaultSelection(project: Project): number | 'intro' | 'outro' | null {
+  if (project.scenes.length) return project.scenes[0].id;
+  if (project.intro.on) return 'intro';
+  if (project.outro.on) return 'outro';
+  return null;
 }
 
 function mapSlide(project: Project, id: number, fn: (s: Slide) => Slide): Project {
@@ -277,15 +292,20 @@ export const useEditorStore = create<EditorState>((set, get) => {
     plan: 'free',
     setPlan: (plan) => set({ plan }),
 
+    selectedSceneId: defaultSelection(initialProject),
+    selectScene: (id) => set({ selectedSceneId: id }),
+
     loadProject: (project, projectId, assets) => {
-      nextId = maxSlideId(project) + 1;
-      resetHistory(project);
+      const normalized = normalizeProject(project);
+      nextId = maxSlideId(normalized) + 1;
+      resetHistory(normalized);
       set(() => ({
-        project,
+        project: normalized,
         projectId,
         assets: { images: { ...(assets?.images ?? {}) }, audio: { ...(assets?.audio ?? {}) } },
         canUndo: false,
         canRedo: false,
+        selectedSceneId: defaultSelection(normalized),
       }));
     },
 
@@ -309,6 +329,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     setTextPos: (textPos) => update((p) => ({ ...p, textPos })),
     setTextAnim: (textAnim) => update((p) => ({ ...p, textAnim })),
     setTransition: (transition) => update((p) => ({ ...p, transition })),
+    setMotionSpeed: (motionSpeed) => update((p) => ({ ...p, motionSpeed })),
 
     setIntro: (patch) => update((p) => ({ ...p, intro: { ...p.intro, ...patch } })),
     setIntroStyle: (key, value) => update((p) => ({ ...p, intro: { ...p.intro, style: withStyle(p.intro.style, key, value) } })),
@@ -336,17 +357,20 @@ export const useEditorStore = create<EditorState>((set, get) => {
     addImageSlide: (assetId, overrides) => {
       const id = nextId++;
       update((p) => ({ ...p, scenes: [...p.scenes, createImageSlide(id, assetId, overrides)] }));
+      set({ selectedSceneId: id });
       return String(id);
     },
     addTextSlide: (overrides) => {
       const id = nextId++;
       update((p) => ({ ...p, scenes: [...p.scenes, createTextSlide(id, overrides)] }));
+      set({ selectedSceneId: id });
       return String(id);
     },
     addStorySlide: () => {
       const id = nextId++;
-      const slide: StorySlide = { kind: 'story', id, style: {}, screens: [], actions: [], sprites: [], cameraMode: 'auto', cameraKeys: [] };
+      const slide: StorySlide = { kind: 'story', id, style: {}, screens: [], actions: [], sprites: [], cameraMode: 'auto', cameraKeys: [], hidden: false };
       update((p) => ({ ...p, scenes: [...p.scenes, slide] }));
+      set({ selectedSceneId: id });
       return String(id);
     },
     updateSlide: (id, patch) => update((p) => mapSlide(p, id, (s) => ({ ...s, ...patch }) as Slide)),
@@ -354,16 +378,27 @@ export const useEditorStore = create<EditorState>((set, get) => {
       set((s) => ({ assets: { ...s.assets, images: { ...s.assets.images, [assetId]: image } } }));
       update((p) => mapSlide(p, id, (s) => (s.kind === 'image' ? { ...s, imgAssetId: assetId } : s)));
     },
-    removeSlide: (id) => update((p) => ({ ...p, scenes: p.scenes.filter((s) => s.id !== id) })),
-    duplicateSlide: (id) =>
+    removeSlide: (id) => {
+      const scenesBefore = get().project.scenes;
+      const i = scenesBefore.findIndex((s) => s.id === id);
+      update((p) => ({ ...p, scenes: p.scenes.filter((s) => s.id !== id) }));
+      if (get().selectedSceneId === id) {
+        const prev = scenesBefore[i - 1];
+        set({ selectedSceneId: prev ? prev.id : defaultSelection(get().project) });
+      }
+    },
+    duplicateSlide: (id) => {
+      const newId = nextId++;
       update((p) => {
         const i = p.scenes.findIndex((s) => s.id === id);
         if (i < 0) return p;
-        const copy: Slide = { ...structuredClone(p.scenes[i]), id: nextId++ };
+        const copy: Slide = { ...structuredClone(p.scenes[i]), id: newId };
         const scenes = [...p.scenes];
         scenes.splice(i + 1, 0, copy);
         return { ...p, scenes };
-      }),
+      });
+      set({ selectedSceneId: newId });
+    },
     moveSlide: (id, dir) =>
       update((p) => {
         const i = p.scenes.findIndex((s) => s.id === id);

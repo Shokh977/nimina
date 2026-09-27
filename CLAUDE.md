@@ -1,8 +1,8 @@
-# Promo Studio — Project Brief
+# Nimina — Project Brief
 
 ## What this is
 
-Promo Studio lets a user upload app screenshots and renders an animated
+Nimina lets a user upload app screenshots and renders an animated
 promo video from them (device frames, text animations, per-slide styles,
 transitions, effects, background music) on an HTML canvas, then exports a
 video file. We are turning a working single-file HTML/JS prototype into a
@@ -54,7 +54,7 @@ behavior. It is a fully self-contained, dependency-free page:
 │   │   ├── (marketing)/         # public marketing pages
 │   │   ├── (auth)/              # sign in / sign up
 │   │   ├── (app)/
-│   │   │   └── editor/[projectId]/   # the Promo Studio editor page
+│   │   │   └── editor/[projectId]/   # the Nimina editor page
 │   │   └── api/                 # route handlers (Paddle webhooks, etc.)
 │   ├── engine/                  # PURE TypeScript canvas engine — NO React,
 │   │   │                        # no Next.js imports. Ported 1:1 from the
@@ -204,24 +204,110 @@ Saved/Saving indicator), and Storage-backed screenshot/icon/music uploads
 are all built on top of this — see `src/components/editor/usePersistence.ts`,
 `src/components/projects/`, and `src/lib/supabase/{storage,projects}.ts`.
 
-## Paddle setup (subscriptions)
+## Paddle setup (subscriptions and one-time payments)
 
 Same graceful-degradation approach as Supabase: `/pricing` and the webhook
 route work without crashing until Paddle env vars are filled in (see
 `src/lib/paddle/config.ts`'s `isPaddleConfigured()`) — checkout just shows
 "Checkout isn't set up yet." and the webhook returns 503.
 
+**Architecture note — pricing has no env-var price IDs at all.** Unlike a
+typical Paddle integration, the three billable price points (Pro monthly,
+Pro yearly, one-time Lifetime) aren't created by hand in Paddle's
+dashboard and pasted into `.env.local` — they're created by this app's own
+server code, from `/admin/pricing`, and stored in the append-only
+`pricing_config` table (`supabase/migrations/0016_pricing_config.sql`,
+logic in `src/lib/paddle/catalog.ts`). An admin types a dollar amount;
+the server calls the Paddle API to create a real Product (once, shared
+across all three) and a real Price, and records it. **Setting a new
+amount always creates a brand-new Paddle price — it never edits an
+existing one.** Paddle prices are effectively immutable once created
+(changing an existing price's amount would retroactively change what
+already-billed customers pay), so a price "change" here means "point
+future checkouts at a new price object," while anyone already
+subscribed/purchased keeps billing at their original price untouched.
+`pricing_config` being append-only (not updated in place) is what lets the
+webhook keep recognizing an *old* price id as "this was the lifetime
+price" even after an admin sets a new one.
+
+**`/pricing` shows Paddle's own real-time prices, not our stored
+`amount_cents`.** `PricingShell.tsx` calls `Paddle.PricePreview()`
+client-side for all configured price ids and renders each one's
+`formattedTotals.total` string exactly as Paddle returns it — no
+`Intl.NumberFormat`, no rounding, no re-formatting, since Paddle's price
+preview already accounts for the visitor's currency/tax/locale. The
+stored `amount_cents`/`formatPrice()` fallback is only used until that
+async call resolves (or if it fails) — it's a flat USD number, never the
+final, tax-correct one. The pricing page (`src/app/(marketing)/pricing/
+page.tsx`) reads the visitor's country server-side from the
+`x-vercel-ip-country` request header (set by Vercel; absent locally and
+on other hosts) and passes it to `PricePreview` as `address.countryCode`
+**only when it's actually present** — never a synthesized "unknown"
+placeholder, so Paddle's own IP-geolocation fallback applies otherwise.
+Checkout (`paddle.Checkout.open()`) always passes `settings: {displayMode:
+'overlay', variant: 'one-page', successUrl: '<origin>/welcome'}` —
+`/welcome` (`src/app/welcome/page.tsx`) is a plain "you're all set,
+go to the editor" page; it doesn't itself read `profiles.plan`, since the
+webhook that actually flips it can land slightly before or after the
+redirect.
+
+**`getPaddleEnv()` (`src/lib/paddle/config.ts`) fails loudly instead of
+defaulting.** Every real Paddle call site (`getPaddle()` in `client.ts`,
+`createPaddleClient()` in `server.ts`) reads `NEXT_PUBLIC_PADDLE_ENV`
+through this function, which throws if it's anything other than exactly
+`'sandbox'` or `'production'` — never silently assumes sandbox. Both call
+sites are only reached after `isPaddleConfigured()` is true, so hitting
+this throw means the account credentials are set but the environment
+var specifically isn't — a real misconfiguration worth surfacing loudly
+rather than risking a live client token accidentally running against
+sandbox (or vice versa).
+
+Lifetime access is deliberately *not* a third `profiles.plan` value — a
+completed lifetime purchase just sets `plan = 'pro'` (identical to an
+active subscription) and records the transaction in a separate
+`purchases` table (`supabase/migrations/0015_lifetime_purchases.sql`).
+Every existing plan check in the app (editor/projects pages, AI
+Director/element-detect routes, `PLAN_LIMITS`) works unchanged for a
+lifetime purchaser. The only place the distinction matters is the webhook
+itself: before a canceled/paused *subscription* downgrades someone to
+`free`, it checks `purchases` first and skips the downgrade if they
+separately bought lifetime access
+(`src/app/api/webhooks/paddle/route.ts`'s `syncSubscription`).
+
+**`customers` (`supabase/migrations/0017_customers.sql`) mirrors Paddle's
+Customer object**, keyed by Paddle's own customer id, written by the same
+webhook (`upsertCustomer()` in `route.ts`, called from every event type
+that carries a `customerId`: `subscription.*`, `transaction.completed`,
+and `customer.created`/`customer.updated`). Paddle's Customer entity
+doesn't carry our `customData`, so a `customer.*` event alone doesn't know
+which of our users it belongs to — `upsertCustomer()` resolves the missing
+side (user id from email, or email from user id) against `profiles`,
+whichever event happens to arrive first. `subscriptions` additionally
+tracks `product_id` (which of the shared Pro product's prices was used)
+and `scheduled_change_action`/`scheduled_change_at` — set when a customer
+cancels/pauses from the portal, but purely informational: Paddle doesn't
+execute a scheduled change immediately, so `status` (and therefore
+`profiles.plan`, via `subscriptionGrantsAccess()` in
+`src/lib/paddle/access.ts`) only changes when it actually takes effect and
+fires its own event.
+
+**Guardrail:** the webhook destination + signing secret, the shared Pro
+product and its prices, and every row in `customers`/`subscriptions`/
+`purchases` are live fulfillment state, not test data — never delete or
+suggest deleting any of them, in this repo or in Paddle's dashboard, even
+after testing.
+
 1. **Create a Paddle account** at [paddle.com](https://www.paddle.com) and
    switch to **Sandbox** mode (toggle in the dashboard sidebar) — build and
-   test entirely in sandbox before ever touching Live mode.
-2. **Create the Pro product + prices.** Catalog → Products → new product
-   ("Pro"), then add two prices on it: one monthly (recurring), one yearly
-   (recurring). Copy each price's ID (`pri_...`).
-3. **Get your API credentials.** Developer Tools → Authentication:
+   test entirely in sandbox before ever touching Live mode. Nothing else
+   needs to be created by hand in the dashboard — no products, no prices.
+2. **Get your API credentials.** Developer Tools → Authentication:
    - **Client-side token** (`test_...` in sandbox) → `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`
-   - **API key** → `PADDLE_API_KEY` (server-only — this can create/cancel
-     subscriptions and read customer data; never expose it to the browser)
-4. **Create a webhook destination.** Developer Tools → Notifications → New
+   - **API key** → `PADDLE_API_KEY` (server-only — this now also creates
+     products/prices from `/admin/pricing`, in addition to creating
+     customer portal sessions and verifying webhooks; never expose it to
+     the browser)
+3. **Create a webhook destination.** Developer Tools → Notifications → New
    destination:
    - For **local development**, Paddle needs a public HTTPS URL to deliver
      to — it can't reach `localhost` directly. Run a tunnel (e.g.
@@ -230,22 +316,49 @@ route work without crashing until Paddle env vars are filled in (see
    - Subscribe to at least: `subscription.created`, `subscription.updated`,
      `subscription.activated`, `subscription.canceled`,
      `subscription.past_due`, `subscription.paused`, `subscription.resumed`,
-     `subscription.trialing`.
+     `subscription.trialing`, **`transaction.completed`** (fires for the
+     one-time Lifetime purchase — also fires for every subscription
+     renewal, but the webhook ignores those and only acts when the
+     transaction's price matches a `pricing_config` row with
+     `key = 'lifetime'`), and **`customer.created`**/**`customer.updated`**
+     (mirrors Paddle's Customer object into the `customers` table).
    - Copy the destination's **signing secret** → `PADDLE_WEBHOOK_SECRET`.
-5. **Fill in `.env.local`**: the two price IDs from step 2, plus the four
-   values above, plus `NEXT_PUBLIC_PADDLE_ENV=sandbox`.
-6. **Run the new migrations** (`0004_subscriptions.sql`,
-   `0005_project_limits.sql`) the same way you ran the earlier ones (CLI
-   `supabase db push`, or paste into the SQL Editor in order).
+   - This same destination works for both sandbox and live — when you go
+     live, create a second destination under the live account (sandbox and
+     production are entirely separate in Paddle) and get a second signing
+     secret for your production `.env`.
+4. **Fill in `.env.local`**: the three credential values above, plus
+   `NEXT_PUBLIC_PADDLE_ENV=sandbox`.
+5. **Run the new migrations** (`0004_subscriptions.sql`,
+   `0005_project_limits.sql`, `0015_lifetime_purchases.sql`,
+   `0016_pricing_config.sql`, `0017_customers.sql`) the same way you ran
+   the earlier ones (CLI `supabase db push`, or paste into the SQL Editor
+   in order).
+6. **Set your prices.** Sign in as an admin, visit `/admin/pricing`, and
+   enter an amount for Pro Monthly, Pro Yearly, and Lifetime. Each save
+   creates a real (sandbox) Paddle product/price — check Paddle's
+   dashboard (Catalog → Products/Prices) to see them appear. `/pricing`
+   picks these up automatically; a price you haven't set yet shows
+   "Coming soon" there instead of a broken buy button.
+7. **Set your default payment link.** This is a dashboard-only setting —
+   nothing to do in code. Checkout → Checkout settings → Default payment
+   link: set it to a page that can host Paddle's checkout (in sandbox,
+   `http://localhost:3000/pricing` is fine; in production, use your real
+   `/pricing` URL — Paddle requires an approved domain, see step below on
+   going live).
 
 ### Testing in sandbox
 
 1. `npm run dev` **and** keep your tunnel (`ngrok http 3000`) running in
    parallel — webhooks only arrive while both are up.
 2. Visit `/pricing` signed in, pick Monthly or Yearly, click **Upgrade**.
-   Paddle's overlay checkout opens — use one of
+   Paddle's checkout opens as a one-page overlay
+   (`settings: {displayMode: 'overlay', variant: 'one-page'}` in
+   `PricingShell.tsx`'s `openCheckout()`) — use one of
    [Paddle's documented sandbox test cards](https://developer.paddle.com/concepts/payment-methods/credit-debit-card#test-a-card-payment)
-   to complete it (never a real card; sandbox never charges anything).
+   to complete it (never a real card; sandbox never charges anything). On
+   success Paddle redirects to `/welcome` (`successUrl` in the same
+   `settings` object) — confirm that page loads correctly.
 3. On success, Paddle fires `subscription.created` (and usually
    `subscription.activated`) to your webhook. Check:
    - Your terminal running `npm run dev` for `[paddle webhook]` log lines
@@ -271,6 +384,22 @@ route work without crashing until Paddle env vars are filled in (see
    enforced by the RLS policy in `0005_project_limits.sql`, not just the
    UI — you can confirm by trying the insert directly in the SQL Editor as
    that user too).
+7. **Test a lifetime purchase** (only if you set a Lifetime amount in
+   setup step 6): visit `/pricing` signed in as a free user, click **Buy
+   lifetime access** on the Lifetime card, complete checkout with a
+   sandbox test card. Confirm `transaction.completed` arrives, a row
+   appears in the `purchases` table, and `profiles.plan` reads `pro`. Then
+   confirm the downgrade guard: if that same user also has (or later
+   starts) a subscription and it gets canceled, `profiles.plan` should
+   **stay** `pro` — check the `[paddle webhook]` logs for confirmation, or
+   just
+   re-run step 4's cancellation test on a lifetime-purchasing user and
+   confirm they don't drop to `free`.
+8. **Test replacing a price**: from `/admin/pricing`, set a different
+   amount for one of the three keys. Confirm a *new* Price object appears
+   in Paddle's dashboard (Catalog → Prices) rather than the old one's
+   amount changing, that `/pricing` immediately reflects the new amount,
+   and that the old price object is still there, untouched.
 
 ### Known limitation, by design
 
@@ -289,10 +418,12 @@ rendering/export to a server, which is a much bigger architectural change.
 Public pages live under `src/app/(marketing)/` (a route group — doesn't
 affect URLs): `/` (landing), `/pricing`, `/privacy`, `/terms`, `/refunds`,
 sharing `Nav`/`Footer` from `src/components/marketing/`. SEO files:
-`src/app/sitemap.ts`, `robots.ts`, `opengraph-image.tsx` (dynamically
-generated via `next/og`) — all use `NEXT_PUBLIC_SITE_URL`, so set that to
-your real domain before going live or links/canonical URLs will point at
-localhost.
+`src/app/sitemap.ts`, `robots.ts`, `manifest.ts` — all use
+`NEXT_PUBLIC_SITE_URL`, so set that to your real domain before going live
+or links/canonical URLs will point at localhost. The Open Graph/Twitter
+image is a committed static file (`public/brand/og-image.png`, regenerated
+via `npm run generate:brand-assets` — see the Brand section below), not a
+dynamic `next/og` route.
 
 **`/privacy`, `/terms`, `/refunds` are placeholder text, clearly marked as
 such on the page itself — they must be reviewed (ideally by a lawyer) and
@@ -311,6 +442,41 @@ signed-in check reads cookies — true static generation for those would
 need Next 16's `cacheComponents: true` opt-in, which changes caching
 behavior app-wide (including the API routes) and wasn't enabled without
 discussing it first; dynamic SSR is still fast in practice.
+
+## Brand
+
+Source assets live in `public/brand/` (SVGs, plus generated raster files —
+regenerate the latter with `npm run generate:brand-assets` after changing
+any source SVG, via `scripts/generate-brand-assets.mjs`).
+
+- **Which file on which background**: `logo-mark-dark.svg` /
+  `logo-full-dark.svg` (ink-colored mark) on **light** backgrounds;
+  `logo-mark-light.svg` / `logo-full-light.svg` (white mark) on **dark**
+  backgrounds. `favicon.svg` is a standalone self-contained badge (ink
+  square + white mark) — always legible on its own, used as-is for the
+  favicon/app icons. `favicon-small.svg` is a simplified variant (wider gap
+  between the N-shape and the triangle) used **only** for the 16/32px
+  favicon renders, where the standard mark's gap anti-aliases into a blob;
+  `favicon-180.png`/`icon-192.png`/`icon-512.png` render from the real
+  `favicon.svg` since they're large enough to stay legible.
+- **Colors**: ink `#121317` (mark-on-light fill, favicon badge background —
+  distinct from the general dark-UI background `#08090c` used elsewhere in
+  the app, don't conflate the two); light mark `#FFFFFF`; primary accent
+  `#5b4bff` (solid CTAs); accent hover/highlight `#8b7dff`.
+- **The export watermark is drawn from `public/brand/nimina-mark-path.json`
+  via `Path2D` on the canvas** (`src/engine/overlays.ts` `drawWatermark`),
+  never rasterized from an SVG/image — that's what keeps it crisp at 4K
+  export resolutions. The path data is duplicated as a small constant
+  inside `overlays.ts` (the pure-TS engine doesn't import from `public/`);
+  keep the two in sync if the mark ever changes.
+- **Auth email**: the magic-link email Supabase sends is configured in the
+  Supabase dashboard (Authentication → Email Templates), not a file in this
+  repo — there's nothing here to edit in code. Suggested copy to paste
+  there:
+  - Subject: `Sign in to Nimina`
+  - Body: `Click the link below to sign in to Nimina. This link expires
+    shortly and can only be used once. If you didn't request this, you can
+    safely ignore this email.`
 
 <!-- BEGIN:nextjs-agent-rules -->
 

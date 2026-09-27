@@ -14,27 +14,35 @@ import { drawTransition } from './transitions';
 import type { AssetMap, IntroConfig, OutroConfig, Project, ResolvedStyle, Segment, Slide, SlideStyle, Timeline } from './types';
 import { easeInOutCubic } from './utils';
 
-function slideDuration(s: Slide): number {
-  return s.kind === 'story' ? getStoryTimeline(s).total : s.dur;
+function slideDuration(s: Slide, speedFactor: number): number {
+  return s.kind === 'story' ? getStoryTimeline(s, speedFactor).total : s.dur / speedFactor;
 }
 
 /** Builds the flat list of timed segments (intro, each slide, outro) from a
- * project, in playback order. */
+ * project, in playback order. Hidden scenes are skipped entirely (no
+ * segment, don't advance `t`) — the one place this needs handling, since
+ * render()/export/the filmstrip/audio-sync all derive from this. Every
+ * duration is divided by `motionSpeed/100` so the whole project stretches
+ * or compresses uniformly around the same 100 = 1.0x default. */
 export function getTimeline(project: Project): Timeline {
+  const speedFactor = project.motionSpeed / 100;
   const list: Segment[] = [];
   let t = 0;
   if (project.intro.on) {
-    list.push({ type: 'intro', owner: project.intro, start: t, dur: project.intro.dur, label: 'Intro' });
-    t += project.intro.dur;
+    const dur = project.intro.dur / speedFactor;
+    list.push({ type: 'intro', owner: project.intro, start: t, dur, label: 'Intro' });
+    t += dur;
   }
   project.scenes.forEach((s, i) => {
-    const dur = slideDuration(s);
+    if (s.hidden) return;
+    const dur = slideDuration(s, speedFactor);
     list.push({ type: 'scene', owner: s, scene: s, start: t, dur, label: (s.kind === 'text' ? 'Aa ' : s.kind === 'story' ? '▶ ' : '') + (i + 1) });
     t += dur;
   });
   if (project.outro.on) {
-    list.push({ type: 'outro', owner: project.outro, start: t, dur: project.outro.dur, label: 'End' });
-    t += project.outro.dur;
+    const dur = project.outro.dur / speedFactor;
+    list.push({ type: 'outro', owner: project.outro, start: t, dur, label: 'End' });
+    t += dur;
   }
   return { list, total: t };
 }

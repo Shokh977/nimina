@@ -282,6 +282,7 @@ export function buildDemoProject(): { project: Project; assets: AssetMap } {
     music: null,
     volume: 0.8,
     ducking: true,
+    motionSpeed: 100,
     scenes: [
       createImageSlide(uid++, 'today', {
         headline: 'Build habits that *actually stick*',

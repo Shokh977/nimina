@@ -1,5 +1,5 @@
 const FAQS: Array<[string, string]> = [
-  ['Do I need design or video-editing skills?', 'No. Pick a device frame and a look, drop in your screenshots, write your headlines, and Promo Studio handles the framing, animation and timing.'],
+  ['Do I need design or video-editing skills?', 'No. Pick a device frame and a look, drop in your screenshots, write your headlines, and Nimina handles the framing, animation and timing.'],
   ['What formats can I export?', 'Vertical 9:16 (Shorts, Reels, TikTok), square 1:1 (feed posts), and widescreen 16:9 (YouTube, websites) — all exported as MP4.'],
   ['What’s the difference between Free and Pro?', 'Free includes 1 saved project, exports up to 720p, and a small watermark. Pro removes the watermark, unlocks up to 4K export, unlimited projects, and every device and effect. See the pricing page for the full list.'],
   ['Which browsers work best for exporting?', 'Recent versions of Chrome, Edge and Safari export fastest. Other browsers fall back to a slower real-time recording automatically — you don’t need to do anything differently.'],

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { createClient } from '@/lib/supabase/client';
@@ -60,9 +61,16 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-full flex-1 items-center justify-center bg-[#ECEEF2] px-4 dark:bg-[#111318]">
+    <main className="flex min-h-full flex-1 flex-col items-center justify-center gap-6 bg-[#ECEEF2] px-4 dark:bg-[#111318]">
+      <Link href="/" className="flex items-center gap-2.5">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, no benefit from next/image's raster optimizer */}
+        <img src="/brand/logo-mark-dark.svg" alt="" className="h-7 w-7 dark:hidden" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, no benefit from next/image's raster optimizer */}
+        <img src="/brand/logo-mark-light.svg" alt="" className="hidden h-7 w-7 dark:block" />
+        <span className="text-lg font-bold">Nimina</span>
+      </Link>
       <div className="w-full max-w-sm rounded-3xl border border-black/10 bg-white p-6 dark:border-white/10 dark:bg-neutral-900">
-        <h1 className="text-xl font-bold">Sign in to Promo Studio</h1>
+        <h1 className="text-xl font-bold">Sign in to Nimina</h1>
         <p className="mt-1 text-[13.5px] text-neutral-500 dark:text-neutral-400">Save your projects and pick up where you left off.</p>
 
         <button

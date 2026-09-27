@@ -1,7 +1,7 @@
 # Config for the Supabase CLI (`supabase` npm package or standalone binary).
 # Used for `supabase link` + `supabase db push` to apply supabase/migrations/
 # to your remote project. See AGENTS.md for the full setup walkthrough.
-project_id = "promo-studio"
+project_id = "nimina"
 
 [db]
 port = 54322

@@ -7,7 +7,7 @@ export default function Hero() {
         Turn your app screenshots into a promo video in minutes
       </h1>
       <p className="mx-auto mt-5 max-w-[560px] text-[16px] text-neutral-600 sm:text-[18px] dark:text-neutral-300">
-        Drop in a few screenshots. Promo Studio frames them in real devices, animates the text, and exports a polished MP4 — no editing software, no design skills.
+        Drop in a few screenshots. Nimina frames them in real devices, animates the text, and exports a polished MP4 — no editing software, no design skills.
       </p>
       <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
         <Link href="/login" className="rounded-xl bg-indigo-600 px-6 py-3 text-[15px] font-bold text-white">

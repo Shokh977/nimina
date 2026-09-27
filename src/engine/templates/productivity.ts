@@ -276,6 +276,7 @@ function buildScenes(strings: ProductivityStrings, variant: 'full' | 'short'): {
     sprites: [],
     cameraMode: 'manual',
     cameraKeys: [{ time: 0, target: { x: 0.5, y: 0.26 }, zoom: 1.35 }],
+    hidden: false,
   };
   slots.push({ key: 'task-detail', label: 'Task detail', hint: 'One task, expanded — the due-date field gets typed into', targets: [{ sceneId: taskDetailStory.id, screenId: 'task-detail' }] });
 
@@ -329,6 +330,7 @@ export const PRODUCTIVITY_TEMPLATE: TemplateDef = {
       music: null,
       volume: 0.8,
       ducking: true,
+      motionSpeed: 100,
       scenes,
     };
     return { project, slots };

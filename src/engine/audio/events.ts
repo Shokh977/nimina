@@ -16,9 +16,10 @@ export interface SfxEvent {
 
 export function getSfxEvents(project: Project): SfxEvent[] {
   const events: SfxEvent[] = [];
+  const speedFactor = project.motionSpeed / 100;
   for (const seg of getTimeline(project).list) {
     if (seg.type !== 'scene' || !seg.scene || seg.scene.kind !== 'story') continue;
-    const timeline = getStoryTimeline(seg.scene);
+    const timeline = getStoryTimeline(seg.scene, speedFactor);
     for (const entry of timeline.entries) {
       const id = resolveSfx(entry.action);
       if (id !== 'none') events.push({ time: seg.start + entry.start, id });

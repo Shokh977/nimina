@@ -302,6 +302,7 @@ function buildScenes(strings: EcommerceStrings, variant: 'full' | 'short'): { sc
     sprites: [],
     cameraMode: 'auto',
     cameraKeys: [],
+    hidden: false,
   };
   // Story starts on the product screen (previous scene's own screenshot),
   // so it needs its own copy of that screen to tap "Add to bag" from —
@@ -358,6 +359,7 @@ export const ECOMMERCE_TEMPLATE: TemplateDef = {
       music: null,
       volume: 0.8,
       ducking: true,
+      motionSpeed: 100,
       scenes,
     };
     return { project, slots };

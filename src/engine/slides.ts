@@ -6,8 +6,9 @@
  */
 import { FONTS, MODELS, SLIDE_DEFAULTS } from './constants';
 import { drawCutoutHollows, drawCutouts } from './cutouts';
-import { drawBadge, drawCallout, drawCounter, drawDevice, drawGesture, focusLocal } from './devices';
+import { drawBadge, drawCallout, drawCounter, drawDevice, drawDevice3D, drawGesture, focusLocal } from './devices';
 import { drawEffect } from './effects';
+import { resolveMotion3d } from './pose3d';
 import { drawWords, layoutWords, textDur } from './text';
 import type { AssetMap, EffectBox, Format, FontDef, ImageAsset, ImageSlide, LayoutRegion, ModelKey, Project, ResolvedStyle, Slide, TextPos, TextSlide } from './types';
 import { clamp, easeInCubic, easeInOutCubic, easeOutBack, easeOutCubic, fontStr, imgH, imgW, rgba, rr } from './utils';
@@ -15,18 +16,23 @@ import { clamp, easeInCubic, easeInOutCubic, easeOutBack, easeOutCubic, fontStr,
 /* ---------- layout ---------- */
 
 export function layout(W: number, H: number, format: Format, textPos: TextPos): LayoutRegion {
-  const bottom = textPos === 'bottom';
-  if (format === '9:16')
-    return bottom
-      ? { mode: 'stack', edge: 'bottom', textX: W / 2, textY: H * 0.725, textW: W * 0.84, hSize: W * 0.083, sSize: W * 0.04, align: 'center', PH: H * 0.6, maxW: W * 0.86, cx: W / 2, cy: H * 0.37 }
-      : { mode: 'stack', edge: 'top', textX: W / 2, textY: H * 0.075, textW: W * 0.84, hSize: W * 0.083, sSize: W * 0.04, align: 'center', PH: H * 0.6, maxW: W * 0.86, cx: W / 2, cy: H * 0.635 };
-  if (format === '1:1')
-    return bottom
-      ? { mode: 'stack', edge: 'bottom', textX: W / 2, textY: H * 0.7, textW: W * 0.86, hSize: W * 0.066, sSize: W * 0.033, align: 'center', PH: H * 0.92, maxW: W * 0.8, cx: W / 2, cy: H * 0.21 }
-      : { mode: 'stack', edge: 'top', textX: W / 2, textY: H * 0.065, textW: W * 0.86, hSize: W * 0.066, sSize: W * 0.033, align: 'center', PH: H * 0.92, maxW: W * 0.8, cx: W / 2, cy: H * 0.79 };
-  return bottom
-    ? { mode: 'side', edge: 'right', textX: W * 0.52, textY: null, textW: W * 0.42, hSize: H * 0.095, sSize: H * 0.044, align: 'left', PH: H * 0.86, maxW: W * 0.44, cx: W * 0.27, cy: H * 0.5 }
-    : { mode: 'side', edge: 'left', textX: W * 0.075, textY: null, textW: W * 0.43, hSize: H * 0.095, sSize: H * 0.044, align: 'left', PH: H * 0.86, maxW: W * 0.44, cx: W * 0.73, cy: H * 0.5 };
+  if (format === '9:16') {
+    if (textPos === 'bottom') return { mode: 'stack', edge: 'bottom', textX: W / 2, textY: H * 0.725, textW: W * 0.84, hSize: W * 0.083, sSize: W * 0.04, align: 'center', PH: H * 0.6, maxW: W * 0.86, cx: W / 2, cy: H * 0.37 };
+    if (textPos === 'center') return { mode: 'stack', edge: 'top', textX: W / 2, textY: H * 0.29, textW: W * 0.84, hSize: W * 0.083, sSize: W * 0.04, align: 'center', PH: H * 0.5, maxW: W * 0.86, cx: W / 2, cy: H * 0.72 };
+    return { mode: 'stack', edge: 'top', textX: W / 2, textY: H * 0.075, textW: W * 0.84, hSize: W * 0.083, sSize: W * 0.04, align: 'center', PH: H * 0.6, maxW: W * 0.86, cx: W / 2, cy: H * 0.635 };
+  }
+  if (format === '1:1') {
+    if (textPos === 'bottom') return { mode: 'stack', edge: 'bottom', textX: W / 2, textY: H * 0.7, textW: W * 0.86, hSize: W * 0.066, sSize: W * 0.033, align: 'center', PH: H * 0.92, maxW: W * 0.8, cx: W / 2, cy: H * 0.21 };
+    if (textPos === 'center') return { mode: 'stack', edge: 'top', textX: W / 2, textY: H * 0.315, textW: W * 0.86, hSize: W * 0.066, sSize: W * 0.033, align: 'center', PH: H * 0.72, maxW: W * 0.8, cx: W / 2, cy: H * 0.73 };
+    return { mode: 'stack', edge: 'top', textX: W / 2, textY: H * 0.065, textW: W * 0.86, hSize: W * 0.066, sSize: W * 0.033, align: 'center', PH: H * 0.92, maxW: W * 0.8, cx: W / 2, cy: H * 0.79 };
+  }
+  // 16:9's side-by-side layout is already vertically centered in both of
+  // its existing options (textY: null, device cy: H*0.5) — the top/bottom
+  // choice there is really "which side holds the text," a question
+  // 'center' doesn't answer, so it falls back to the same left-text
+  // arrangement as the default (non-bottom) option.
+  if (textPos === 'bottom') return { mode: 'side', edge: 'right', textX: W * 0.52, textY: null, textW: W * 0.42, hSize: H * 0.095, sSize: H * 0.044, align: 'left', PH: H * 0.86, maxW: W * 0.44, cx: W * 0.27, cy: H * 0.5 };
+  return { mode: 'side', edge: 'left', textX: W * 0.075, textY: null, textW: W * 0.43, hSize: H * 0.095, sSize: H * 0.044, align: 'left', PH: H * 0.86, maxW: W * 0.44, cx: W * 0.73, cy: H * 0.5 };
 }
 
 export function geom(L: LayoutRegion, model: ModelKey) {
@@ -176,7 +182,12 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
       ctx.restore();
     });
   }
-  drawDevice(ctx, img, PW, PH, style, project.appName, scroll);
+  if (scene.pose3d) {
+    const pose = resolveMotion3d(scene.pose3d, scene.motion3d, local, dur);
+    drawDevice3D(ctx, img, PW, PH, style, project.appName, scroll, pose);
+  } else {
+    drawDevice(ctx, img, PW, PH, style, project.appName, scroll);
+  }
   drawGesture(ctx, scene, img, local, PW, PH, scroll, style);
   drawCutoutHollows(ctx, scene, img, style, local, PW, PH, scroll);
   ctx.restore();

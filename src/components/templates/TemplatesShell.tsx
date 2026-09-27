@@ -24,7 +24,7 @@ export default function TemplatesShell({ userEmail, templates }: { userEmail: st
     <main className="mx-auto max-w-[1200px] px-3 py-6 sm:px-6">
       <div className="flex items-center justify-between gap-4">
         <Link href="/projects" className="text-lg font-bold hover:underline">
-          Promo Studio
+          Nimina
         </Link>
         <UserMenu email={userEmail} />
       </div>

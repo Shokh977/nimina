@@ -6,6 +6,32 @@
 import { PRESETS } from './constants';
 import type { Project } from './types';
 
+/** Every image asset id a project's scenes reference — the intro/outro
+ * icon, each image scene's screenshot, and every story slide's screens/
+ * sprites/action icons. Shared by every place that needs to resolve real
+ * uploaded assets for a project: the editor's own hydration
+ * (usePersistence.ts, useTemplatePersistence.ts) and the admin template
+ * preview regenerator (TemplatePreviewRegenerator.tsx). */
+export function collectImageAssetIds(project: Project): Set<string> {
+  const ids = new Set<string>();
+  project.scenes.forEach((s) => {
+    if (s.kind === 'image' && s.imgAssetId) ids.add(s.imgAssetId);
+    if (s.kind === 'story') {
+      s.screens.forEach((screen) => ids.add(screen.assetId));
+      s.actions.forEach((a) => {
+        if (a.type === 'launchApp' && a.iconAssetId) ids.add(a.iconAssetId);
+        if (a.type === 'loading' && a.logoAssetId) ids.add(a.logoAssetId);
+        if (a.type === 'notification' && a.iconAssetId) ids.add(a.iconAssetId);
+      });
+      s.sprites.forEach((sp) => {
+        if (sp.source.kind === 'asset') ids.add(sp.source.assetId);
+      });
+    }
+  });
+  if (project.iconAssetId) ids.add(project.iconAssetId);
+  return ids;
+}
+
 export function createDefaultProject(): Project {
   return {
     format: '9:16',
@@ -32,5 +58,20 @@ export function createDefaultProject(): Project {
     music: null,
     volume: 0.8,
     ducking: true,
+    motionSpeed: 100,
+  };
+}
+
+/** Backfills fields added after a project may have been saved — `hidden`
+ * on scenes, `motionSpeed` on the project — so the store's "Project is
+ * always fully populated once loaded" invariant holds for every consumer,
+ * without scattering `?? false`/`?? 100` fallbacks across the engine. Call
+ * once at every load boundary (editorStore's loadProject, and wherever a
+ * template/project is first hydrated server-side). */
+export function normalizeProject(p: Project): Project {
+  return {
+    ...p,
+    motionSpeed: p.motionSpeed ?? 100,
+    scenes: p.scenes.map((s) => ({ ...s, hidden: s.hidden ?? false })),
   };
 }
