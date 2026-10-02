@@ -6,7 +6,7 @@ import { getTimeline } from '@/engine/render';
 import { getTemplate } from '@/engine/templates';
 import type { Project } from '@/engine/types';
 import { createClient } from '@/lib/supabase/client';
-import { loadProjectImageAssets } from '@/lib/supabase/storage';
+import { loadProjectImageAssets } from '@/lib/storage/assets';
 import type { TemplateData } from '@/lib/supabase/templates';
 import { useEditorStore } from '@/store/editorStore';
 import type { SaveStatus } from './usePersistence';
@@ -72,7 +72,7 @@ export function useTemplatePersistence(templateId: string, initialProject: Proje
       // Best-effort: a real upload from a prior editing session overrides
       // the procedural placeholder above. Most ids won't have one yet —
       // that's expected, not an error.
-      const realAssets = await loadProjectImageAssets(supabase, templateId, initialProject);
+      const realAssets = await loadProjectImageAssets(templateId, initialProject);
       if (!cancelled) {
         for (const [assetId, img] of Object.entries(realAssets)) useEditorStore.getState().registerImage(assetId, img);
       }

@@ -4,8 +4,7 @@ import { useRef } from 'react';
 
 import { DURS } from '@/engine/constants';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { createClient } from '@/lib/supabase/client';
-import { uploadAsset } from '@/lib/supabase/storage';
+import { uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from '../PlaybackContext';
 import StyleEditor from '../StyleEditor';
@@ -54,7 +53,7 @@ export default function SlidesPanel() {
     const { image } = await loadImageFile(file);
     const assetId = newAssetId('icon');
     setIcon(assetId, image);
-    if (projectId) uploadAsset(createClient(), projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
+    if (projectId) uploadAsset(projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
     introSeek();
   };
 

@@ -6,8 +6,7 @@ import { ANIMS, CAMERAS, DEFAULT_COUNTER, DURS, EFFECTS, GESTURES, LAYOUTS, MOTI
 import type { ClassicSlide, CounterConfig, CounterFormat, Effect, ImageSlide, Pose3D, PosePresetKey, Slide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { isPro, PRO_ONLY_EFFECTS } from '@/lib/plan';
-import { createClient } from '@/lib/supabase/client';
-import { uploadAsset } from '@/lib/supabase/storage';
+import { uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from '../PlaybackContext';
 import StyleEditor from '../StyleEditor';
@@ -102,7 +101,7 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
     const { image: newImage } = await loadImageFile(file);
     const assetId = newAssetId('img');
     replaceSlideImage(slide.id, assetId, newImage);
-    if (projectId) uploadAsset(createClient(), projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
+    if (projectId) uploadAsset(projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
     seek(start + 1.4);
   };
 

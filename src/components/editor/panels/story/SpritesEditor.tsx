@@ -4,8 +4,7 @@ import { useRef } from 'react';
 
 import type { BuiltInSprite, Sprite, StorySlide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { createClient } from '@/lib/supabase/client';
-import { uploadAsset } from '@/lib/supabase/storage';
+import { uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { BUILTIN_SPRITES, EASINGS } from '../../storyFields';
 import Details from '../../ui/Details';
@@ -50,7 +49,7 @@ function SpriteRow({ slide, sprite, onRemove }: { slide: StorySlide; sprite: Spr
  const { image } = await loadImageFile(file);
  const assetId = newAssetId('sprite');
  registerImage(assetId, image);
- if (projectId) uploadAsset(createClient(), projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
+ if (projectId) uploadAsset(projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
  updateSprite(slide.id, sprite.id, { source: { kind: 'asset', assetId } });
  };
 

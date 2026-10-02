@@ -6,7 +6,7 @@ import { isAiDirectorConfigured } from '@/lib/ai/config';
 import { runDirector, type DirectorImage } from '@/lib/ai/director';
 import { DirectorRequestSchema } from '@/lib/ai/schema';
 import { logEvent } from '@/lib/events';
-import { getSignedAssetUrl } from '@/lib/supabase/storage';
+import { isR2Configured, projectKey, r2 } from '@/lib/r2/server';
 import { createClient } from '@/lib/supabase/server';
 
 function startOfMonthIso(): string {
@@ -52,15 +52,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `You've used AI Director ${used} times this month (limit ${limit} on the ${plan} plan). Try again next month${plan === 'free' ? ', or upgrade to Pro' : ''}.` }, { status: 429 });
   }
 
-  // getSignedAssetUrl (and the RLS behind `projects`) both scope strictly to
-  // this user's own project — a screenshot asset id from someone else's
-  // project simply won't resolve, there's no cross-account read path here.
+  // Keys are built from this user's own id — a screenshot asset id from
+  // someone else's project simply won't resolve, there's no cross-account
+  // read path here.
   let images: DirectorImage[];
   try {
     images = await Promise.all(
       screenshots.map(async ({ sceneId, assetId }): Promise<DirectorImage> => {
-        const url = await getSignedAssetUrl(supabase, projectId, assetId);
-        const res = await fetch(url);
+        if (!isR2Configured()) throw new Error('File storage is not configured');
+        const store = r2();
+        const res = await store.get(store.bucketName('private'), projectKey(user.id, projectId, assetId));
         if (!res.ok) throw new Error(`Couldn't fetch screenshot ${assetId}`);
         const contentType = res.headers.get('content-type') ?? '';
         const mediaType = contentType.includes('png') ? 'image/png' : contentType.includes('webp') ? 'image/webp' : contentType.includes('gif') ? 'image/gif' : 'image/jpeg';

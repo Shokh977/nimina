@@ -2,13 +2,14 @@
 /**
  * Renders every template's preview video (via /dev/render-previews, a real
  * browser page — canvas/WebCodecs export can't run in plain Node) and
- * uploads the results to the public `template-previews` Storage bucket,
+ * uploads the results to the public R2 bucket (under template-previews/),
  * then records each URL on the matching `templates` row (see
  * supabase/migrations/0012_template_previews.sql). Same service-role-key,
  * upsert-and-done shape as scripts/seed-music-library.ts.
  *
  * Requires `npm run dev` already running (this doesn't start it) and
- * NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in .env.local.
+ * NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY + the R2_* variables
+ * in .env.local.
  *
  * Usage: node --env-file=.env.local scripts/render-template-previews.mjs
  *        node --env-file=.env.local scripts/render-template-previews.mjs --url=http://localhost:3000
@@ -16,9 +17,10 @@
 import { chromium } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 
+import { r2FromEnv } from './lib/r2.mjs';
+
 const urlArg = process.argv.find((a) => a.startsWith('--url='));
 const baseUrl = urlArg ? urlArg.slice('--url='.length) : 'http://localhost:3000';
-const BUCKET = 'template-previews';
 
 async function main() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,6 +30,7 @@ async function main() {
     process.exit(1);
   }
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const r2 = r2FromEnv();
 
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
@@ -60,12 +63,10 @@ async function main() {
   for (const [templateId, videos] of byTemplate) {
     const update = {};
     for (const [tag, buf] of Object.entries(videos)) {
-      const path = `${templateId}/preview-${tag}.mp4`;
+      const path = `template-previews/${templateId}/preview-${tag}.mp4`;
       console.log(`Uploading ${path} (${(buf.length / 1048576).toFixed(2)}MB)...`);
-      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, buf, { upsert: true, contentType: 'video/mp4' });
-      if (uploadError) throw uploadError;
-      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      update[tag === '9x16' ? 'preview_video_9x16_url' : 'preview_video_16x9_url'] = pub.publicUrl;
+      await r2.put(r2.bucketName('public'), path, buf, 'video/mp4');
+      update[tag === '9x16' ? 'preview_video_9x16_url' : 'preview_video_16x9_url'] = `${r2.publicObjectUrl(path)}?v=${Date.now()}`;
     }
     // Upload always proceeds for every template even if the DB step below
     // fails for one (e.g. supabase/migrations/0012_template_previews.sql

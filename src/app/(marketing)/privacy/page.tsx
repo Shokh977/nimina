@@ -19,7 +19,7 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             <>
-              <b>Account information</b>: your email address, used for sign-in (via magic link or Google sign-in) and account identification. Authentication is handled by our
+              <b>Account information</b>: your email address, used for sign-in (password, email code or Google sign-in) and account identification. Authentication is handled by our
               infrastructure provider, Supabase.
             </>,
             <>
@@ -48,8 +48,9 @@ export default function PrivacyPage() {
 
       <LegalSection title="Where it's stored">
         <p>
-          Account data, project data, and uploaded files are stored with Supabase, our database/storage provider. [State the hosting region(s) if you&apos;ve pinned your Supabase
-          project to a specific region, and whether that matters for your users&apos; jurisdiction.]
+          Account and project data are stored with Supabase, our database provider. Uploaded files (screenshots, icons, music) are stored with Cloudflare R2, our file storage
+          provider, in a private bucket only reachable through short-lived links our servers issue to you. [State the hosting region(s) if you&apos;ve pinned your Supabase
+          project or R2 bucket to a specific region, and whether that matters for your users&apos; jurisdiction.]
         </p>
       </LegalSection>
 

@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import type { DashboardProject } from '@/components/projects/dashboardData';
 import ProjectsShell from '@/components/projects/ProjectsShell';
 import type { Plan } from '@/lib/plan';
-import { getSignedThumbnailUrl } from '@/lib/supabase/storage';
+import { isR2Configured, r2 } from '@/lib/r2/server';
 import { listProjects } from '@/lib/supabase/projects';
 import { createClient } from '@/lib/supabase/server';
 import { listEnabledTemplates, toMarketingCard } from '@/lib/supabase/templates';
@@ -37,7 +37,7 @@ export default async function ProjectsPage() {
   const [rows, templateRows] = await Promise.all([listProjects(supabase), listEnabledTemplates(supabase)]);
   const projects: DashboardProject[] = await Promise.all(
     rows.map(async (row) => {
-      const thumbnailUrl = await getSignedThumbnailUrl(supabase, row.thumbnail_path);
+      const thumbnailUrl = row.thumbnail_path && isR2Configured() ? await r2().signGet(r2().bucketName('private'), row.thumbnail_path) : null;
       return { id: row.id, name: row.name, status: thumbnailUrl ? 'rendered' : 'draft', meta: formatRelativeTime(row.updated_at), thumbnailUrl };
     }),
   );

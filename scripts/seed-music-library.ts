@@ -2,7 +2,7 @@
  * One-time (or re-run-anytime) seed script for the curated music library —
  * procedurally generates the placeholder tracks in
  * src/engine/audio/proceduralMusic.ts, encodes them to WAV, and uploads
- * them to the public `music-library` Storage bucket + `music_tracks` table
+ * them to the public R2 bucket (under music-library/) + the `music_tracks` table
  * (see supabase/migrations/0006_music_library.sql) using the service-role
  * key. These are clearly-labeled placeholder tracks (see that file's doc
  * comment) proving the library pipeline end to end, not an attempt at
@@ -12,16 +12,16 @@
  * Run with:
  *   node --env-file=.env.local scripts/seed-music-library.ts
  *
- * Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in
- * .env.local (the same ones the app's server-only admin client uses).
+ * Requires NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and the R2_*
+ * variables in .env.local (the same ones the app's server uses).
  */
 import { createClient } from '@supabase/supabase-js';
 
+import { r2FromEnv } from './lib/r2.mjs';
 import { MUSIC_TRACK_DEFS, generateProceduralTrack } from '../src/engine/audio/proceduralMusic.ts';
 import { encodeWavMono } from '../src/engine/audio/wav.ts';
 
 const SAMPLE_RATE = 44100;
-const BUCKET = 'music-library';
 
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -31,6 +31,7 @@ async function main() {
     process.exit(1);
   }
   const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  const r2 = r2FromEnv();
 
   for (const def of MUSIC_TRACK_DEFS) {
     const samples = generateProceduralTrack(def, SAMPLE_RATE);
@@ -39,8 +40,7 @@ async function main() {
     const durationSeconds = samples.length / SAMPLE_RATE;
 
     console.log(`Uploading ${storagePath} (${durationSeconds.toFixed(2)}s, ${def.bpm} BPM)…`);
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, wav, { upsert: true, contentType: 'audio/wav' });
-    if (uploadError) throw uploadError;
+    await r2.put(r2.bucketName('public'), `music-library/${storagePath}`, wav, 'audio/wav', 'public, max-age=31536000');
 
     const { error: dbError } = await supabase.from('music_tracks').upsert({
       id: def.id,

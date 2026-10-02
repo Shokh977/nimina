@@ -6,10 +6,8 @@ import { exportVideo } from '@/engine/export';
 import { getTemplate } from '@/engine/templates';
 import { applyShortVariant } from '@/lib/templateShortVariant';
 import { createClient } from '@/lib/supabase/client';
-import { loadProjectImageAssets } from '@/lib/supabase/storage';
+import { loadProjectImageAssets, uploadTemplatePreview } from '@/lib/storage/assets';
 import type { TemplateData } from '@/lib/supabase/templates';
-
-const BUCKET = 'template-previews';
 
 /** Runs the real canvas/MediaRecorder export client-side, in the admin's
  * own browser tab (there's no server-side headless-browser rendering in
@@ -42,7 +40,7 @@ export default function TemplatePreviewRegenerator({ templateId, sampleAssetsSou
  const data = row.data as TemplateData;
  const sourceDef = sampleAssetsSourceId ? getTemplate(sampleAssetsSourceId) : undefined;
  const sampleAssets = sourceDef?.buildSampleAssets?.() ?? {};
- const realAssets = await loadProjectImageAssets(supabase, templateId, data.project);
+ const realAssets = await loadProjectImageAssets(templateId, data.project);
  const assets = { ...sampleAssets, ...realAssets };
  const urls: Partial<{ '9x16': string; '16x9': string }> = {};
 
@@ -53,11 +51,7 @@ export default function TemplatePreviewRegenerator({ templateId, sampleAssetsSou
  try {
  const project = applyShortVariant(data.project, data.shortVariant);
  const result = await exportVideo({ ...project, format: fmt }, assets, null, { resolution: '1080p' }, new AbortController().signal);
- const path = `${templateId}/preview-${tag}.mp4`;
- const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(path, result.blob, { upsert: true, contentType: 'video/mp4' });
- if (uploadErr) throw uploadErr;
- const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
- urls[tag] = pub.publicUrl;
+ urls[tag] = await uploadTemplatePreview(templateId, tag, result.blob);
  lines.push(`[ok] ${tag}: ${(result.sizeBytes / 1048576).toFixed(2)}MB, ${result.seconds.toFixed(1)}s`);
  } catch (err) {
  lines.push(`[fail] ${tag}: ${err instanceof Error ? err.message : String(err)}`);

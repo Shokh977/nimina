@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createDefaultProject } from '@/engine/project';
 import type { Project } from '@/engine/types';
 import { logEvent } from '../events';
-import { deleteProjectAssets, duplicateProjectAssets } from './storage';
+import { deleteProjectAssets, duplicateProjectAssets } from '@/lib/storage/assets';
 
 export interface ProjectListItem {
   id: string;
@@ -96,12 +96,12 @@ export async function duplicateProject(supabase: SupabaseClient, source: Project
   if (error) throw error;
   const copy = data as ProjectRow;
 
-  await duplicateProjectAssets(supabase, source.id, copy.id);
+  await duplicateProjectAssets(source.id, copy.id).catch((err) => console.error('[projects] copying files failed', err));
   return copy;
 }
 
 export async function deleteProject(supabase: SupabaseClient, id: string): Promise<void> {
-  await deleteProjectAssets(supabase, id);
+  await deleteProjectAssets(id).catch((err) => console.error('[projects] deleting files failed', err));
   const { error } = await supabase.from('projects').delete().eq('id', id);
   if (error) throw error;
 }

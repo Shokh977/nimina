@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { isPaddleConfigured } from '@/lib/paddle/config';
 import { createPaddleClient } from '@/lib/paddle/server';
+import { isR2Configured, r2 } from '@/lib/r2/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -51,18 +52,14 @@ export async function POST(request: Request) {
   }
 
   // 2. Files: paths are {user_id}/{project_id}/{file}.
-  const bucket = admin.storage.from('assets');
-  const { data: folders, error: listError } = await bucket.list(user.id, { limit: 1000 });
-  if (listError) return NextResponse.json({ error: 'File storage is unreachable, so nothing was deleted. Try again.' }, { status: 502 });
-  for (const folder of folders ?? []) {
-    const prefix = `${user.id}/${folder.name}`;
-    for (;;) {
-      const { data: items } = await bucket.list(prefix, { limit: 1000 });
-      if (!items?.length) break;
-      const { error } = await bucket.remove(items.map((i) => `${prefix}/${i.name}`));
-      if (error) return NextResponse.json({ error: 'Some files could not be deleted. Your account is still here. Try again.' }, { status: 502 });
-      if (items.length < 1000) break;
-    }
+  if (!isR2Configured()) return NextResponse.json({ error: 'File storage is unreachable, so nothing was deleted. Try again later.' }, { status: 503 });
+  try {
+    const store = r2();
+    await store.deletePrefix(store.bucketName('private'), `${user.id}/`);
+    if ((await store.list(store.bucketName('private'), `${user.id}/`)).length) throw new Error('files remain after delete');
+  } catch (err) {
+    console.error('[account/delete] file cleanup failed', err);
+    return NextResponse.json({ error: 'Some files could not be deleted. Your account is still here. Try again.' }, { status: 502 });
   }
 
   // 3. Projects. 4. The account.

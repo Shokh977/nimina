@@ -4,8 +4,7 @@ import { useRef, useState } from 'react';
 
 import type { StorySlide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { createClient } from '@/lib/supabase/client';
-import { uploadAsset } from '@/lib/supabase/storage';
+import { uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 
 /** The story slide's full/tall screenshots — referenced by id from
@@ -27,7 +26,7 @@ export default function ScreensStrip({ slide }: { slide: StorySlide }) {
  const { image } = await loadImageFile(file);
  const assetId = newAssetId('img');
  registerImage(assetId, image);
- if (projectId) uploadAsset(createClient(), projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
+ if (projectId) uploadAsset(projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
  return assetId;
  };
 

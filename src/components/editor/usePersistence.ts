@@ -6,10 +6,10 @@ import { FORMATS } from '@/engine/constants';
 import { render } from '@/engine/render';
 import type { Project } from '@/engine/types';
 import { loadImageFromUrl } from '@/lib/assetSrc';
+import { getSignedAssetUrls, uploadThumbnail } from '@/lib/storage/assets';
 import { createClient } from '@/lib/supabase/client';
 import { getMusicLibraryUrl } from '@/lib/supabase/musicLibrary';
 import { saveProjectData, saveProjectThumbnail } from '@/lib/supabase/projects';
-import { getSignedAssetUrl, uploadThumbnail } from '@/lib/supabase/storage';
 import { useEditorStore } from '@/store/editorStore';
 
 const SAVE_DEBOUNCE_MS = 1500;
@@ -20,7 +20,7 @@ export type SaveStatus = 'loading' | 'saving' | 'saved' | 'error';
 
 /**
  * Loads `initialProject` (and its referenced images/music, via signed
- * Storage URLs) into the editor store on mount, then autosaves every
+ * R2 URLs) into the editor store on mount, then autosaves every
  * subsequent edit back to `projects.data` — debounced so rapid edits
  * collapse into one write, same spirit as the local undo-history debounce.
  * Also periodically regenerates and uploads a thumbnail.
@@ -50,7 +50,7 @@ export function usePersistence(projectId: string, initialProject: Project): Save
         render(ctx, project, useEditorStore.getState().assets.images, 0, scale);
         const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
         if (!blob) return;
-        const path = await uploadThumbnail(supabase, projectId, blob);
+        const path = await uploadThumbnail(projectId, blob);
         await saveProjectThumbnail(supabase, projectId, path);
       } catch (err) {
         // Thumbnail failures shouldn't surface as a save error — the
@@ -101,10 +101,19 @@ export function usePersistence(projectId: string, initialProject: Project): Save
       });
       if (initialProject.iconAssetId) imageIds.add(initialProject.iconAssetId);
 
+      const ownMusicId = initialProject.music && !initialProject.music.assetId.startsWith('library:') ? initialProject.music.assetId : null;
+      let urls: Record<string, string> = {};
+      try {
+        urls = await getSignedAssetUrls(projectId, [...imageIds, ...(ownMusicId ? [ownMusicId] : [])]);
+      } catch (err) {
+        console.error('[persistence] failed to sign asset URLs', err);
+      }
+
       await Promise.all(
         [...imageIds].map(async (assetId) => {
           try {
-            const url = await getSignedAssetUrl(supabase, projectId, assetId);
+            const url = urls[assetId];
+            if (!url) return;
             const img = await loadImageFromUrl(url);
             if (!cancelled) useEditorStore.getState().registerImage(assetId, img);
           } catch (err) {
@@ -118,9 +127,10 @@ export function usePersistence(projectId: string, initialProject: Project): Save
         try {
           // Library tracks (see MotionPanel's onPickLibraryTrack) are
           // stored with a 'library:<path>' id and live in the public
-          // music-library bucket; a user's own upload lives in the private
-          // per-project assets bucket and needs a signed URL.
-          const url = musicAssetId.startsWith('library:') ? getMusicLibraryUrl(supabase, musicAssetId.slice('library:'.length)) : await getSignedAssetUrl(supabase, projectId, musicAssetId);
+          // bucket; a user's own upload lives in their private project
+          // folder and needs a signed URL.
+          const url = musicAssetId.startsWith('library:') ? getMusicLibraryUrl(musicAssetId.slice('library:'.length)) : urls[musicAssetId];
+          if (!url) throw new Error('no URL for the music file');
           const res = await fetch(url);
           const arrayBuffer = await res.arrayBuffer();
           const audioCtx = new AudioContext();

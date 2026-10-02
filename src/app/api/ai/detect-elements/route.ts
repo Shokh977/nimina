@@ -5,7 +5,7 @@ import { runElementDetector } from '@/lib/ai/elementDetector';
 import { DetectElementsRequestSchema } from '@/lib/ai/schema';
 import { logEvent } from '@/lib/events';
 import { PLAN_LIMITS, type Plan } from '@/lib/plan';
-import { getSignedAssetUrl } from '@/lib/supabase/storage';
+import { isR2Configured, projectKey, r2 } from '@/lib/r2/server';
 import { createClient } from '@/lib/supabase/server';
 
 function startOfMonthIso(): string {
@@ -59,11 +59,11 @@ export async function POST(request: Request) {
   let base64: string;
   let mediaType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
   try {
-    // getSignedAssetUrl (and the RLS behind `projects`) both scope strictly
-    // to this user's own project — an asset id from someone else's project
-    // simply won't resolve.
-    const url = await getSignedAssetUrl(supabase, projectId, assetId);
-    const res = await fetch(url);
+    // The key is built from this user's own id — an asset id from someone
+    // else's project simply won't resolve.
+    if (!isR2Configured()) throw new Error('File storage is not configured');
+    const store = r2();
+    const res = await store.get(store.bucketName('private'), projectKey(user.id, projectId, assetId));
     if (!res.ok) throw new Error("Couldn't fetch the screenshot");
     const contentType = res.headers.get('content-type') ?? '';
     mediaType = contentType.includes('png') ? 'image/png' : contentType.includes('webp') ? 'image/webp' : contentType.includes('gif') ? 'image/gif' : 'image/jpeg';

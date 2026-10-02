@@ -7,7 +7,7 @@ import type { Slide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { createClient } from '@/lib/supabase/client';
 import { createProjectFromTemplate } from '@/lib/supabase/projects';
-import { uploadAsset } from '@/lib/supabase/storage';
+import { uploadAsset } from '@/lib/storage/assets';
 import { getTemplateForWizard, type TemplateWithPreview } from '@/lib/supabase/templates';
 
 /** Modal wizard: shows the template's screenshot "slots", lets the user
@@ -122,7 +122,7 @@ export default function TemplateWizard({ templateId, onClose }: { templateId: st
           const file = files[slot.key];
           const assetId = assetIdForSlot.get(slot.key);
           if (!file || !assetId) return;
-          await uploadAsset(supabase, row.id, assetId, file);
+          await uploadAsset(row.id, assetId, file);
         }),
       );
 

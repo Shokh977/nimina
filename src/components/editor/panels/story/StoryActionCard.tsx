@@ -5,8 +5,7 @@ import { useRef } from 'react';
 import { snapToBeat } from '@/engine/audio';
 import type { Action, ImageAsset, StorySlide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { createClient } from '@/lib/supabase/client';
-import { uploadAsset } from '@/lib/supabase/storage';
+import { uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from '../../PlaybackContext';
 import { sceneStart } from '../../timelineHelpers';
@@ -357,7 +356,7 @@ function IconAssetField({ label, assetId, onChange }: { label: string; assetId?:
  const id = newAssetId('icon');
  registerImage(id, image);
  onChange(id, image);
- if (projectId) uploadAsset(createClient(), projectId, id, file).catch((err) => console.error('[assets] upload failed', err));
+ if (projectId) uploadAsset(projectId, id, file).catch((err) => console.error('[assets] upload failed', err));
  };
 
  return (

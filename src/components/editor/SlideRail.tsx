@@ -6,8 +6,7 @@ import { resolveStyle } from '@/engine/render';
 import { getStoryTimeline } from '@/engine/story';
 import type { Slide } from '@/engine/types';
 import { loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { createClient } from '@/lib/supabase/client';
-import { uploadAsset } from '@/lib/supabase/storage';
+import { uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from './PlaybackContext';
 import SectionLabel from './ui/SectionLabel';
@@ -75,7 +74,7 @@ export default function SlideRail() {
         const assetId = newAssetId('img');
         registerImage(assetId, image);
         addImageSlide(assetId);
-        if (projectId) uploadAsset(createClient(), projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
+        if (projectId) uploadAsset(projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
       } catch {
         // skip files that fail to decode
       }

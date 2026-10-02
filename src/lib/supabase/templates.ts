@@ -4,7 +4,7 @@ import type { TemplateSlot } from '@/engine/templates';
 import type { Project } from '@/engine/types';
 import { applyShortVariant, type ShortVariant } from '@/lib/templateShortVariant';
 import { slugify, uniqueSlug } from '@/lib/slug';
-import { duplicateProjectAssets } from './storage';
+import { duplicateProjectAssets } from '@/lib/storage/assets';
 
 export interface TemplateData {
   project: Project;
@@ -147,7 +147,7 @@ export async function duplicateTemplate(supabase: SupabaseClient, sourceId: stri
   const { error: versionErr } = await supabase.from('template_versions').insert({ template_id: newId, version: 1, data: source.data, created_by: user?.id ?? null });
   if (versionErr) throw versionErr;
 
-  await duplicateProjectAssets(supabase, sourceId, newId);
+  await duplicateProjectAssets(sourceId, newId).catch((err) => console.error('[templates] copying files failed', err));
 
   return newId;
 }

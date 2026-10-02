@@ -36,8 +36,9 @@ behavior. It is a fully self-contained, dependency-free page:
   marketing pages, editor UI.
 - **Zustand** — editor state (replaces the prototype's plain `state` object
   + hand-rolled history).
-- **Supabase** — auth, Postgres (projects, scenes, user data), file storage
-  (uploaded screenshots, app icons, music, exported videos).
+- **Supabase** — auth, Postgres (projects, scenes, user data).
+- **Cloudflare R2** — file storage (uploaded screenshots, app icons, music,
+  template previews).
 - **Paddle** — subscriptions, as merchant of record (handles tax/invoicing).
 - **Vercel** — deployment.
 
@@ -195,18 +196,19 @@ you're ready to test auth and saved projects:
    - **Or paste manually**: SQL Editor in the dashboard → paste and run
      each file in `supabase/migrations/` in order (`0001_...`, `0002_...`,
      `0003_...`).
-7. **Verify the storage bucket.** `0003_storage.sql` creates a private
-   `assets` bucket with RLS policies — check Storage in the dashboard shows
-   an `assets` bucket that is **not** public.
+7. **Files are not in Supabase.** Uploads live in Cloudflare R2 — see
+   "File storage (Cloudflare R2)". (`0003_storage.sql`'s `assets` bucket is
+   the pre-R2 location, kept only as the migration source.)
 8. **Test it.** `npm run dev`, visit `/login`, try both the magic link
    (check your inbox) and "Continue with Google". On success you land back
    in `/editor` with your email shown top-right and a working Sign out
    button.
 
 The `/projects` grid, `/editor/[id]` project loading, autosave (with a
-Saved/Saving indicator), and Storage-backed screenshot/icon/music uploads
+Saved/Saving indicator), and R2-backed screenshot/icon/music uploads
 are all built on top of this — see `src/components/editor/usePersistence.ts`,
-`src/components/projects/`, and `src/lib/supabase/{storage,projects}.ts`.
+`src/components/projects/`, `src/lib/supabase/projects.ts` and
+`src/lib/storage/assets.ts`.
 
 ## Paddle setup (subscriptions and one-time payments)
 
@@ -520,7 +522,7 @@ every writer of the auth cookies drops their lifetime
 (`src/lib/auth/cookies.ts`) so they end with the browser.
 
 Account deletion (`/api/account/delete`) cancels any live Paddle
-subscription first (and stops if that fails), deletes the user's storage
+subscription first (and stops if that fails), deletes the user's R2
 folder, projects and auth user. Billing rows (subscriptions, purchases,
 customers) are **kept** with `user_id` cleared — migration 0018 changed
 those foreign keys from CASCADE to SET NULL.
@@ -594,6 +596,46 @@ those foreign keys from CASCADE to SET NULL.
    <p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email_change">Confirm {{ .NewEmail }}</a> as your Nimina sign-in email.</p>
    <p>If you didn't ask for this, ignore this email and nothing will change.</p>
    ```
+
+## File storage (Cloudflare R2)
+
+All files live in Cloudflare R2 (10 GB free, no download fees), not
+Supabase Storage. Two buckets:
+
+- **private** (`R2_PRIVATE_BUCKET`): user uploads — screenshots, icons,
+  music, project thumbnails — at `{user_id}/{project_id}/{asset_id}`
+  (project data stores only the asset id).
+- **public** (`R2_PUBLIC_BUCKET`, served at `NEXT_PUBLIC_R2_PUBLIC_URL`):
+  `template-previews/{template_id}/preview-{9x16|16x9}.mp4` and
+  `music-library/{file}`.
+
+The browser never holds R2 credentials. Uploads: `/api/storage/upload`
+checks the signed-in user, the file type and size (`src/lib/storage/rules.ts`)
+and builds the key from the user's own id, then returns a pre-signed PUT URL
+with the approved Content-Type and Content-Length signed in — R2 rejects any
+other file. The browser PUTs straight to R2 (no server function in the
+data path, so no 4.5 MB function body limit). Reads: `/api/storage/urls`
+signs one-hour GET URLs; `/api/storage/project` copies/deletes a project
+folder. Server code uses `src/lib/r2/server.ts`; the S3/SigV4 client is
+`src/lib/r2/core.ts` (also used by scripts via `scripts/lib/r2.mjs`).
+Background upload failures show in the editor's save badge.
+
+`scripts/migrate-storage-to-r2.mjs` copied the old Supabase Storage files
+(dry run by default, `--apply`, `--verify`; never deletes from Supabase).
+
+### R2 setup (Cloudflare dashboard)
+
+1. Create buckets `nimina-private` and `nimina-public`.
+2. `nimina-public` → Settings → Public Development URL → enable; that URL
+   is `NEXT_PUBLIC_R2_PUBLIC_URL`. (r2.dev is rate-limited — connect a
+   custom domain before real traffic.)
+3. CORS (each bucket → Settings → CORS policy):
+   - private: `[{"AllowedOrigins":["https://nimina.vercel.app","http://localhost:3000"],"AllowedMethods":["GET","PUT","HEAD"],"AllowedHeaders":["content-type"],"MaxAgeSeconds":3600}]`
+   - public: `[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"MaxAgeSeconds":86400},{"AllowedOrigins":["https://nimina.vercel.app","http://localhost:3000"],"AllowedMethods":["PUT"],"AllowedHeaders":["content-type"],"MaxAgeSeconds":3600}]`
+   Add every origin the app runs on (custom domain, etc.) to both.
+4. R2 → Manage API tokens → Create: "Object Read & Write", limited to the
+   two buckets → `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`; the account
+   id is `R2_ACCOUNT_ID`. Same six vars in `.env.local` and on the host.
 
 ## Brand
 

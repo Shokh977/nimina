@@ -7,7 +7,7 @@ import type { TextAnim, Transition } from '@/engine/types';
 import { newAssetId } from '@/lib/assetSrc';
 import { createClient } from '@/lib/supabase/client';
 import { getMusicLibraryUrl, listMusicLibrary, type MusicLibraryTrack } from '@/lib/supabase/musicLibrary';
-import { uploadAsset } from '@/lib/supabase/storage';
+import { uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import Details from '../ui/Details';
 import RangeInput from '../ui/RangeInput';
@@ -74,7 +74,7 @@ export default function MotionPanel() {
       const buffer = await ctx.decodeAudioData(arrayBuffer);
       const assetId = newAssetId('music');
       setMusic(assetId, file.name, buffer);
-      if (projectId) uploadAsset(createClient(), projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
+      if (projectId) uploadAsset(projectId, assetId, file, 'audio').catch((err) => console.error('[assets] upload failed', err));
       setMusicStatus('');
     } catch {
       setMusicStatus("That file couldn't be read. Try an MP3, M4A or WAV.");
@@ -85,7 +85,7 @@ export default function MotionPanel() {
     async (track: MusicLibraryTrack) => {
       setLibraryLoadingId(track.id);
       try {
-        const url = getMusicLibraryUrl(createClient(), track.storagePath);
+        const url = getMusicLibraryUrl(track.storagePath);
         const res = await fetch(url);
         const arrayBuffer = await res.arrayBuffer();
         const ctx = getAudioContext();

@@ -1,9 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const BUCKET = 'music-library';
+import { publicFileUrl } from '@/lib/storage/assets';
 
 /** A curated background-music track (see supabase/migrations/0006_music_library.sql).
- * Unlike the private per-user `assets` bucket, this bucket is public — these
+ * The files live in the public R2 bucket under music-library/ (unlike private user uploads) — these
  * are shared, non-sensitive catalog assets — so tracks are fetched by plain
  * public URL, no signing needed. */
 export interface MusicLibraryTrack {
@@ -35,6 +35,6 @@ export async function listMusicLibrary(supabase: SupabaseClient): Promise<MusicL
   }));
 }
 
-export function getMusicLibraryUrl(supabase: SupabaseClient, storagePath: string): string {
-  return supabase.storage.from(BUCKET).getPublicUrl(storagePath).data.publicUrl;
+export function getMusicLibraryUrl(storagePath: string): string {
+  return publicFileUrl(`music-library/${storagePath}`);
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { createAdminClient } from '@/lib/supabase/admin';
+import { isR2Configured, r2 } from '@/lib/r2/server';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -23,13 +23,7 @@ export async function GET() {
     supabase.from('purchases').select('*').eq('user_id', user.id),
   ]);
 
-  const bucket = createAdminClient().storage.from('assets');
-  const files: string[] = [];
-  const { data: folders } = await bucket.list(user.id, { limit: 1000 });
-  for (const folder of folders ?? []) {
-    const { data: items } = await bucket.list(`${user.id}/${folder.name}`, { limit: 1000 });
-    for (const item of items ?? []) files.push(`${user.id}/${folder.name}/${item.name}`);
-  }
+  const files = isR2Configured() ? (await r2().list(r2().bucketName('private'), `${user.id}/`)).map((o) => ({ path: o.key, bytes: o.size })) : [];
 
   const body = {
     exportedAt: new Date().toISOString(),
