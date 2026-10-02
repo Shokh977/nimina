@@ -1,4 +1,7 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = { title: 'Welcome to Pro' };
 
 /** Paddle's checkout `successUrl` redirect target (see openCheckout() in
  * PricingShell.tsx). Purely informational — the actual plan upgrade

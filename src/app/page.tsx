@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import ClosingCta from '@/components/home/ClosingCta';
 import Faq from '@/components/home/Faq';
 import FeatureBento from '@/components/home/FeatureBento';
@@ -15,6 +16,8 @@ import { DEFAULT_SITE_CONTENT, getSiteContent } from '@/lib/siteContent';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { createClient } from '@/lib/supabase/server';
 import { listEnabledTemplates, toMarketingCard, type MarketingTemplateCard } from '@/lib/supabase/templates';
+
+export const metadata: Metadata = { alternates: { canonical: '/' } };
 
 /**
  * The marketing homepage — fully self-contained (own header/footer, own

@@ -1,9 +1,12 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
 import UserMenu from '@/components/auth/UserMenu';
 import EngineFonts from '@/components/EngineFonts';
 import { createClient } from '@/lib/supabase/server';
+
+export const metadata: Metadata = { title: 'Admin' };
 
 const NAV = [
   { href: '/admin', label: 'Dashboard' },

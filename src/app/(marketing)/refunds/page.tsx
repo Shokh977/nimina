@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import LegalPage, { LegalList, LegalSection } from '@/components/marketing/LegalPage';
 
-export const metadata: Metadata = { title: 'Refund Policy' };
+export const metadata: Metadata = { title: 'Refund Policy', alternates: { canonical: '/refunds' } };
 
 export default function RefundsPage() {
   return (

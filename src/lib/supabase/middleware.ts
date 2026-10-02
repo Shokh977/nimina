@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { isSupabaseConfigured } from './config';
 
-const PROTECTED_PREFIXES = ['/editor', '/projects', '/templates', '/admin'];
+// /templates is deliberately public: visitors browse the gallery before
+// signing up (picking one prompts sign-up — see TemplatesShell).
+const PROTECTED_PREFIXES = ['/editor', '/projects', '/admin'];
 
 /**
  * Refreshes the Supabase session on every navigation (required so Server

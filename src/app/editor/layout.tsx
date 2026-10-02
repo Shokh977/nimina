@@ -4,7 +4,7 @@ import EngineFonts from '@/components/EngineFonts';
 import { instrumentSans, spaceGrotesk } from '@/lib/fonts';
 
 export const metadata: Metadata = {
-  title: 'Editor — Nimina',
+  title: 'Editor',
 };
 
 /**

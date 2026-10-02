@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -140,11 +141,19 @@ export default function PricingShell({
           <p className="mt-4 text-2xl font-bold">$0</p>
           <ul className="mt-5 space-y-2 text-[14px]">
             <li>1 saved project</li>
-            <li>Export up to 720p</li>
+            <li>Video export up to 720p</li>
+            <li>Store screenshots: one store size, half resolution</li>
+            <li>1 language</li>
             <li>&quot;Made with Nimina&quot; watermark</li>
             <li>Core devices &amp; effects</li>
           </ul>
-          {currentPlan === 'free' && <div className="mt-6 rounded-xl bg-neutral-100 px-3 py-2 text-center text-[13px] font-semibold dark:bg-neutral-800">Your current plan</div>}
+          {!userId ? (
+            <Link href="/login" className="mt-6 block w-full rounded-xl border border-black/10 px-4 py-2.5 text-center font-bold dark:border-white/10">
+              Start free
+            </Link>
+          ) : (
+            currentPlan === 'free' && <div className="mt-6 rounded-xl bg-neutral-100 px-3 py-2 text-center text-[13px] font-semibold dark:bg-neutral-800">Your current plan</div>
+          )}
         </div>
 
         <div className="rounded-3xl border-2 border-indigo-500 p-6">
@@ -153,7 +162,9 @@ export default function PricingShell({
           <p className="mt-4 text-2xl font-bold">{priceLabel(proEntry, ` / ${cycle === 'monthly' ? 'mo' : 'yr'}`)}</p>
           <ul className="mt-5 space-y-2 text-[14px]">
             <li>Unlimited projects</li>
-            <li>Export up to 4K</li>
+            <li>Video export up to 4K</li>
+            <li>Store screenshots: every App Store &amp; Google Play size, full resolution</li>
+            <li>Unlimited languages + AI translation</li>
             <li>No watermark</li>
             <li>All devices &amp; effects</li>
           </ul>

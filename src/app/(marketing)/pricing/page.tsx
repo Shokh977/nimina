@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 
 import { isPaddleConfigured } from '@/lib/paddle/config';
@@ -5,6 +6,12 @@ import { getCurrentPricing } from '@/lib/paddle/catalog';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { createClient } from '@/lib/supabase/server';
 import PricingShell from '@/components/pricing/PricingShell';
+
+export const metadata: Metadata = {
+  title: 'Pricing',
+  description: 'Start free. Pro unlocks 4K video, every App Store and Google Play screenshot size, unlimited languages with AI translation, and no watermark.',
+  alternates: { canonical: '/pricing' },
+};
 
 export default async function PricingPage() {
   let userEmail: string | null = null;

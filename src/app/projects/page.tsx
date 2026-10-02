@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import type { DashboardProject } from '@/components/projects/dashboardData';
@@ -7,6 +8,8 @@ import { getSignedThumbnailUrl } from '@/lib/supabase/storage';
 import { listProjects } from '@/lib/supabase/projects';
 import { createClient } from '@/lib/supabase/server';
 import { listEnabledTemplates, toMarketingCard } from '@/lib/supabase/templates';
+
+export const metadata: Metadata = { title: 'Your projects' };
 
 function formatRelativeTime(iso: string): string {
   const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
