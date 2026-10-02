@@ -10,7 +10,7 @@ export default function Hero() {
         Drop in a few screenshots. Nimina frames them in real devices, animates the text, and exports a polished MP4 — no editing software, no design skills.
       </p>
       <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-        <Link href="/login" className="rounded-xl bg-indigo-600 px-6 py-3 text-[15px] font-bold text-white">
+        <Link href="/login?mode=signup" className="rounded-xl bg-indigo-600 px-6 py-3 text-[15px] font-bold text-white">
           Start free
         </Link>
         <Link href="/pricing" className="rounded-xl border border-black/10 px-6 py-3 text-[15px] font-bold dark:border-white/15">

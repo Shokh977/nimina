@@ -14,7 +14,10 @@ import { createClient } from '@/lib/supabase/server';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/editor';
+  // /projects, not /editor: /editor creates a project on arrival, which would
+  // spend a free user's single project before they've picked a template.
+  const rawNext = searchParams.get('next');
+  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/projects';
   const upstreamError = searchParams.get('error_description') || searchParams.get('error');
 
   if (upstreamError) {

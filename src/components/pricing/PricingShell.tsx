@@ -87,7 +87,7 @@ export default function PricingShell({
 
   const openCheckout = async (priceId: string, which: 'subscription' | 'lifetime') => {
     if (!userId) {
-      router.push('/login?next=/pricing');
+      router.push('/login?mode=signup&next=/pricing');
       return;
     }
     setCheckoutError(null);
@@ -148,7 +148,7 @@ export default function PricingShell({
             <li>Core devices &amp; effects</li>
           </ul>
           {!userId ? (
-            <Link href="/login" className="mt-6 block w-full rounded-xl border border-black/10 px-4 py-2.5 text-center font-bold dark:border-white/10">
+            <Link href="/login?mode=signup" className="mt-6 block w-full rounded-xl border border-black/10 px-4 py-2.5 text-center font-bold dark:border-white/10">
               Start free
             </Link>
           ) : (
