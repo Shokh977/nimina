@@ -79,6 +79,9 @@ export default function DashboardHeader({ userEmail, plan }: { userEmail: string
 
             {open && (
               <div role="menu" className="absolute top-[calc(100%+8px)] right-0 w-[230px] rounded-[14px] border border-white/[.08] bg-[#11131a] p-2 shadow-[0_26px_60px_rgba(0,0,0,.6)]">
+                <Link role="menuitem" href="/account" className="block rounded-[9px] px-2.5 py-2.5 text-[13.5px] text-[#e6e8ee] hover:bg-white/[.06]" onClick={() => setOpen(false)}>
+                  Account settings
+                </Link>
                 <Link role="menuitem" href="/pricing" className="block rounded-[9px] px-2.5 py-2.5 text-[13.5px] text-[#e6e8ee] hover:bg-white/[.06]" onClick={() => setOpen(false)}>
                   Account settings
                 </Link>

@@ -45,10 +45,10 @@ export default function TemplatesShell({ userEmail, templates }: { userEmail: st
           <UserMenu email={userEmail} />
         ) : (
           <div className="flex items-center gap-3 text-[14px] font-semibold">
-            <Link href="/login?mode=signin&next=/templates" className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white">
+            <Link href="/login?next=/templates" className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white">
               Log in
             </Link>
-            <Link href="/login?mode=signup&next=/templates" className="rounded-xl bg-indigo-600 px-3.5 py-2 text-white hover:bg-indigo-500">
+            <Link href="/signup?next=/templates" className="rounded-xl bg-indigo-600 px-3.5 py-2 text-white hover:bg-indigo-500">
               Start free
             </Link>
           </div>
@@ -108,7 +108,7 @@ export default function TemplatesShell({ userEmail, templates }: { userEmail: st
             </h2>
             <p className="mt-2 text-[13.5px] text-neutral-500 dark:text-neutral-400">Create a free account to drop your screenshots into this template. No card needed.</p>
             <Link
-              href={`/login?mode=signup&next=${encodeURIComponent(`/templates?open=${signUpFor.id}`)}`}
+              href={`/signup?next=${encodeURIComponent(`/templates?open=${signUpFor.id}`)}`}
               className="mt-5 block rounded-xl bg-indigo-600 px-4 py-2.5 font-bold text-white hover:bg-indigo-500"
             >
               Start free

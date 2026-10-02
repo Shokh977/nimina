@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { createProject, deleteProject, duplicateProject, getProject } from '@/lib/supabase/projects';
 import type { MarketingTemplateCard } from '@/lib/supabase/templates';
 import DashboardFooter from './DashboardFooter';
+import SetPasswordPrompt from '@/components/auth/SetPasswordPrompt';
 import DashboardHeader from './DashboardHeader';
 import type { DashboardProject } from './dashboardData';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
@@ -22,7 +23,19 @@ import Toolbar, { type StatusTab, type ViewMode } from './Toolbar';
 
 const VIEW_STORAGE_KEY = 'promo-studio:projects-view';
 
-export default function ProjectsShell({ userEmail, plan, templates, initialProjects }: { userEmail: string; plan: Plan; templates: MarketingTemplateCard[]; initialProjects: DashboardProject[] }) {
+export default function ProjectsShell({
+  userEmail,
+  plan,
+  templates,
+  initialProjects,
+  promptSetPassword = false,
+}: {
+  userEmail: string;
+  plan: Plan;
+  templates: MarketingTemplateCard[];
+  initialProjects: DashboardProject[];
+  promptSetPassword?: boolean;
+}) {
   const router = useRouter();
   const [projects, setProjects] = useState<DashboardProject[]>(initialProjects);
   // The server component (src/app/projects/page.tsx) re-fetches on every
@@ -119,6 +132,7 @@ export default function ProjectsShell({ userEmail, plan, templates, initialProje
   return (
     <div className={`${spaceGrotesk.variable} ${instrumentSans.variable} min-h-full bg-[#08090c] text-[#f4f5f8]`} style={{ fontFamily: 'var(--font-instrument-sans), "Instrument Sans", system-ui, sans-serif' }}>
       <DashboardHeader userEmail={userEmail} plan={plan} />
+      {promptSetPassword && <SetPasswordPrompt email={userEmail} />}
 
       <main className="mx-auto max-w-[1320px] px-6 pt-9 pb-24">
         <div className="mb-2 flex flex-wrap items-start justify-between gap-4">

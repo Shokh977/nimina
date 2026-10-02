@@ -1,6 +1,7 @@
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
+import { RECOVERY_COOKIE } from '@/lib/auth/route';
 import { createClient } from '@/lib/supabase/server';
 
 const EMAIL_OTP_TYPES: EmailOtpType[] = ['email', 'magiclink', 'signup', 'invite', 'recovery', 'email_change'];
@@ -15,8 +16,9 @@ function friendly(message: string): string {
 /**
  * Lands both sign-in methods:
  *
- * - Email link → `?token_hash=…&type=…` (the Supabase email templates build
- *   the link as `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email`).
+ * - Email links (sign-up verification, password reset, email change) →
+ *   `?token_hash=…&type=…`; the Supabase email templates build them as
+ *   `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=<email|recovery|email_change>`.
  *   Verified server-side, so it works in ANY browser or device — no PKCE
  *   code verifier involved. See CLAUDE.md ("Auth email").
  * - Google (and email links from templates that still use the default
@@ -32,7 +34,7 @@ export async function GET(request: Request) {
   // spend a free user's single project before they've picked a template.
   const rawNext = searchParams.get('next');
   const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/projects';
-  const fail = (message: string) => NextResponse.redirect(`${origin}/login?mode=signin&next=${encodeURIComponent(next)}&error=${encodeURIComponent(friendly(message))}`);
+  const fail = (message: string) => NextResponse.redirect(`${origin}/login?next=${encodeURIComponent(next)}&error=${encodeURIComponent(friendly(message))}`);
 
   const upstreamError = searchParams.get('error_description') || searchParams.get('error');
   if (upstreamError) {
@@ -44,8 +46,14 @@ export async function GET(request: Request) {
   const type = searchParams.get('type') as EmailOtpType | null;
   if (tokenHash && type && EMAIL_OTP_TYPES.includes(type)) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
-    if (!error) return NextResponse.redirect(`${origin}${next}`);
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (!error) {
+      const res = NextResponse.redirect(`${origin}${next}`);
+      // A password-reset link: let /reset-password set a new password
+      // without the current one, for the next 15 minutes only.
+      if (type === 'recovery' && data.user) res.cookies.set(RECOVERY_COOKIE, data.user.id, { httpOnly: true, sameSite: 'lax', secure: origin.startsWith('https'), path: '/', maxAge: 15 * 60 });
+      return res;
+    }
     console.error('[auth/callback] verifyOtp(token_hash) failed:', error.message);
     return fail(error.message);
   }

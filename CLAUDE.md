@@ -494,6 +494,107 @@ before anything is applied), the stage's language switcher, and Export →
 All languages (one ZIP, a folder per locale). Plan limits: `maxLanguages`
 and `maxTranslateUsesPerMonth` in `src/lib/plan.ts`.
 
+## Accounts & sign-in
+
+Three ways in, on `/login` and `/signup` (shared layout in `src/app/(auth)/`):
+**email + password** (primary), **email + 6-digit code** (Supabase OTP —
+works across devices: request on a laptop, read the code on a phone), and
+**Google**. Plus `/forgot-password`, `/reset-password`, `/verify-email` and
+`/account` (profile, password, sign-in methods, plan, sessions, data
+export, account deletion).
+
+Every email/password/code action goes through a server route in
+`src/app/api/auth/*` — that is where the password rules
+(`src/lib/auth/password.ts`: 8+ characters, not on the bundled
+common-password list or a common word with digits bolted on), the
+per-email and per-IP rate limits (`src/lib/auth/rateLimit.ts`,
+counted by `public.hit_rate_limit`) and the "never reveal whether an
+address is registered" wording (`src/lib/auth/messages.ts`) are enforced.
+`app_metadata.has_password` (server-writable only) records whether an
+account has a password; magic-link-era accounts without one are offered
+a one-time, skippable "add a password" prompt on /projects
+(`SetPasswordPrompt`) and keep code sign-in forever.
+
+"Stay signed in" (on by default) is the `nimina-persist` cookie; when off,
+every writer of the auth cookies drops their lifetime
+(`src/lib/auth/cookies.ts`) so they end with the browser.
+
+Account deletion (`/api/account/delete`) cancels any live Paddle
+subscription first (and stops if that fails), deletes the user's storage
+folder, projects and auth user. Billing rows (subscriptions, purchases,
+customers) are **kept** with `user_id` cleared — migration 0018 changed
+those foreign keys from CASCADE to SET NULL.
+
+### Supabase dashboard setup (can't be done from code)
+
+1. **Run migration `0018_accounts.sql`** (rate limits, session listing,
+   billing-preserving deletes).
+2. **Authentication → Providers → Email**: Email provider on;
+   **Confirm email ON** (password sign-ups must verify before they can sign
+   in or export); **Secure email change ON**; **Secure password change OFF**
+   (the app checks the current password itself; with it on, Supabase
+   additionally demands a reauthentication code from sessions older than a
+   day); **Email OTP Expiration = 600** seconds (10 minutes); **Email OTP
+   Length = 6**.
+3. **Authentication → Sign In / Providers → Allow manual linking ON** — needed
+   for "Connect Google" on /account.
+4. **URL Configuration**: Site URL `https://nimina.vercel.app`; Redirect
+   URLs `https://nimina.vercel.app/auth/callback` and
+   `http://localhost:3000/auth/callback`.
+5. **Custom SMTP (Authentication → Emails → SMTP Settings)** — Supabase's
+   built-in sender only allows a handful of emails per hour and is meant for
+   testing; every sign-up, code and reset is an email, so launch needs a
+   real provider (Resend, Postmark, SES…).
+6. **Email templates** (Authentication → Email Templates) — paste exactly,
+   keeping each `{{ … }}` on one line. Links use
+   `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=…` (verified
+   server-side by `/auth/callback`, so they work in any browser), never the
+   default `{{ .ConfirmationURL }}` (PKCE — only works in the browser that
+   asked, the source of "PKCE code verifier not found in storage").
+
+   **Magic Link** (the sign-in code — code only, no link):
+   ```
+   Subject: Your Nimina sign-in code: {{ .Token }}
+   ```
+   ```html
+   <h2>Your sign-in code</h2>
+   <p style="font-size:30px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
+   <p>Enter it on the Nimina page you came from — on any device. It expires in 10 minutes and works once.</p>
+   <p>If you didn't try to sign in, you can ignore this email.</p>
+   ```
+
+   **Confirm signup** (verification — code and link; also used when a new
+   address signs up with a code):
+   ```
+   Subject: Verify your Nimina email — code {{ .Token }}
+   ```
+   ```html
+   <h2>Verify your email</h2>
+   <p>Your code is <b style="font-size:22px;letter-spacing:4px">{{ .Token }}</b> — enter it on the page you came from, on any device.</p>
+   <p>Or <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">verify with this link</a>.</p>
+   <p>If you didn't create a Nimina account, you can ignore this email.</p>
+   ```
+
+   **Reset Password**:
+   ```
+   Subject: Reset your Nimina password
+   ```
+   ```html
+   <h2>Reset your password</h2>
+   <p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery">Choose a new password</a>. The link works once and expires in an hour.</p>
+   <p>If you didn't ask for this, ignore this email — your password stays the same.</p>
+   ```
+
+   **Change Email Address**:
+   ```
+   Subject: Confirm your new Nimina email
+   ```
+   ```html
+   <h2>Confirm your new email</h2>
+   <p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email_change">Confirm {{ .NewEmail }}</a> as your Nimina sign-in email.</p>
+   <p>If you didn't ask for this, ignore this email and nothing will change.</p>
+   ```
+
 ## Brand
 
 Source assets live in `public/brand/` (SVGs, plus generated raster files —
@@ -520,35 +621,8 @@ any source SVG, via `scripts/generate-brand-assets.mjs`).
   export resolutions. The path data is duplicated as a small constant
   inside `overlays.ts` (the pure-TS engine doesn't import from `public/`);
   keep the two in sync if the mark ever changes.
-- **Auth email**: configured in the Supabase dashboard (Authentication →
-  Email Templates), not in this repo. `/login` (src/app/login/page.tsx)
-  takes a **6-digit code typed on the page, or the link** — and both must
-  work from any device (people request on a laptop and open mail on a
-  phone). So in **both the "Magic Link" and "Confirm signup" templates**
-  (Supabase uses Confirm signup for a brand-new address):
-  - include `{{ .Token }}` (the code), and
-  - build the link as `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email`
-    — NOT the default `{{ .ConfirmationURL }}`, which uses the PKCE flow and
-    only completes in the browser that requested it ("PKCE code verifier
-    not found in storage"). `/auth/callback` verifies the token hash
-    server-side. `{{ .RedirectTo }}` is the app's
-    `/auth/callback?next=…` URL, so it must be in Authentication → URL
-    Configuration → Redirect URLs (otherwise Supabase swaps in the bare
-    Site URL and the link breaks).
-
-  Suggested copy for both templates (paste exactly — keep each `{{ … }}`
-  on one line):
-
-  Subject:
-  ```
-  Your Nimina sign-in code: {{ .Token }}
-  ```
-  Body (HTML):
-  ```html
-  <p>Your sign-in code is <b>{{ .Token }}</b> — enter it on the Nimina page you came from.</p>
-  <p>Or <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">sign in with this link</a> on any device.</p>
-  <p>The code and link expire shortly and work once. If you didn't request this, you can ignore this email.</p>
-  ```
+- **Auth emails**: see "Accounts & sign-in" above for the exact
+  Supabase email templates.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

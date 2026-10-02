@@ -43,5 +43,9 @@ export default async function ProjectsPage() {
   );
   const templates = templateRows.map(toMarketingCard);
 
-  return <ProjectsShell userEmail={user.email ?? ''} plan={plan} templates={templates} initialProjects={projects} />;
+  // Accounts from the magic-link era: email-only, never set a password, never asked.
+  const providers = (user.identities ?? []).map((i) => i.provider);
+  const promptSetPassword = providers.length > 0 && providers.every((p) => p === 'email') && !user.app_metadata?.has_password && !user.user_metadata?.password_prompt_done;
+
+  return <ProjectsShell userEmail={user.email ?? ''} plan={plan} templates={templates} initialProjects={projects} promptSetPassword={promptSetPassword} />;
 }
