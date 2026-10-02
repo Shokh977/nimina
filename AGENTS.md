@@ -520,14 +520,19 @@ any source SVG, via `scripts/generate-brand-assets.mjs`).
   export resolutions. The path data is duplicated as a small constant
   inside `overlays.ts` (the pure-TS engine doesn't import from `public/`);
   keep the two in sync if the mark ever changes.
-- **Auth email**: the magic-link email Supabase sends is configured in the
-  Supabase dashboard (Authentication → Email Templates), not a file in this
-  repo — there's nothing here to edit in code. Suggested copy to paste
-  there:
-  - Subject: `Sign in to Nimina`
-  - Body: `Click the link below to sign in to Nimina. This link expires
-    shortly and can only be used once. If you didn't request this, you can
-    safely ignore this email.`
+- **Auth email**: configured in the Supabase dashboard (Authentication →
+  Email Templates), not in this repo. `/login` (src/app/login/page.tsx)
+  signs in with a **6-digit code typed on the page or the link** — the
+  code works from any device, while the PKCE link only completes in the
+  browser that requested it. So **both the "Magic Link" and "Confirm
+  signup" templates must include `{{ .Token }}`** (Supabase uses Confirm
+  signup for a brand-new address); without it the page asks for a code the
+  email doesn't contain. Suggested copy for both:
+  - Subject: `Your Nimina sign-in code: {{ .Token }}`
+  - Body: `Your sign-in code is {{ .Token }} — enter it on the Nimina
+    page you came from. Or click this link in the same browser:
+    {{ .ConfirmationURL }}. The code and link expire shortly and work once.
+    If you didn't request this, you can ignore this email.`
 
 <!-- BEGIN:nextjs-agent-rules -->
 
