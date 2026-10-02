@@ -1,13 +1,19 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { FORMATS } from '@/engine/constants';
+import { renderLocaleFor } from '@/engine/localization';
+import { withTextLocale } from '@/engine/locales';
 import { getTimeline, resolveStyle } from '@/engine/render';
 import { layout } from '@/engine/slides';
 import type { ClassicSlide, Format } from '@/engine/types';
 import { useEditorStore } from '@/store/editorStore';
 import type { PlaybackEngine } from './usePlaybackEngine';
+
+// Multilingual projects only (loaded on demand, like the Languages tab).
+const LanguageSwitcher = dynamic(() => import('./LanguageSwitcher'));
 
 /** Per-ratio CSS-px caps for the canvas's *height* — the stage box is
  * measured (ResizeObserver), never guessed, so the filmstrip/transport
@@ -63,6 +69,7 @@ function HighlightedText({ text, accent }: { text: string; accent: string }) {
 export default function Stage({ engine }: { engine: PlaybackEngine }) {
   const project = useEditorStore((s) => s.project);
   const updateSlide = useEditorStore((s) => s.updateSlide);
+  const previewLocale = useEditorStore((s) => s.previewLocale);
   const { canvasRef, displayT, setDisplaySize, playing } = engine;
 
   const boxRef = useRef<HTMLDivElement>(null);
@@ -119,9 +126,16 @@ export default function Stage({ engine }: { engine: PlaybackEngine }) {
   const seg = segments[idx];
   const style = seg ? resolveStyle(project, seg.owner) : null;
   const slide: ClassicSlide | null = seg?.type === 'scene' && seg.scene && seg.scene.kind !== 'story' ? seg.scene : null;
-  const L = layout(FORMATS[project.format].w, FORMATS[project.format].h, project.format, style?.textPos ?? 'top');
+  // The overlay edits the project's own (source-language) text in place,
+  // so it's laid out in the source language — and hidden entirely while a
+  // translation is previewed (the translation table edits those).
+  const loc = project.localization;
+  const sourceLocale = loc ? renderLocaleFor(loc, loc.source) : undefined;
+  const previewingTranslation = !!loc && !!previewLocale && previewLocale !== loc.source;
+  const L = withTextLocale(sourceLocale, () => layout(FORMATS[project.format].w, FORMATS[project.format].h, project.format, style?.textPos ?? 'top'));
   const cssScale = size.width / FORMATS[project.format].w;
-  const textLeft = (L.align === 'center' ? L.textX - L.textW / 2 : L.textX) * cssScale;
+  const textLeft = (L.align === 'center' ? L.textX - L.textW / 2 : L.align === 'right' ? L.textX - L.textW : L.textX) * cssScale;
+  const textDir = sourceLocale?.dir ?? 'ltr';
   const headlineTop = (L.textY ?? FORMATS[project.format].h * 0.075) * cssScale;
   const minHeadlineGap = L.hSize * cssScale * 1.35;
   const subTop = headlineTop + Math.max(minHeadlineGap, headlineHeight + 6);
@@ -153,8 +167,9 @@ export default function Stage({ engine }: { engine: PlaybackEngine }) {
       >
         <div className="relative flex-none overflow-hidden rounded-[22px] border border-white/10 shadow-[0_40px_90px_rgba(0,0,0,.6)]" style={{ width: size.width, height: size.height }}>
           <canvas ref={canvasRef} className="block" />
+          {(project.localization?.languages.length ?? 0) > 1 && <LanguageSwitcher />}
 
-        {slide && style && (
+        {slide && style && !previewingTranslation && (
           <>
             <span className="absolute top-3 left-3 rounded-[7px] bg-[#08090c]/55 px-[9px] py-[5px] text-[11px] font-semibold text-[#f4f5f8] backdrop-blur-sm">{slide.headline ? stripStars(slide.headline).slice(0, 24) || 'Slide' : 'Slide'}</span>
 
@@ -165,7 +180,7 @@ export default function Stage({ engine }: { engine: PlaybackEngine }) {
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={commitEdit}
                 onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
-                style={{ left: textLeft, top: headlineTop - 6, width: L.textW * cssScale, fontSize: L.hSize * cssScale, textAlign: L.align }}
+                style={{ left: textLeft, top: headlineTop - 6, width: L.textW * cssScale, fontSize: L.hSize * cssScale, textAlign: L.align, direction: textDir }}
                 className="absolute resize-none rounded-[9px] border border-dashed border-white/75 bg-black/[.18] font-[family-name:var(--font-space-grotesk)] leading-[1.15] font-bold text-white outline-none"
                 rows={2}
               />
@@ -173,7 +188,7 @@ export default function Stage({ engine }: { engine: PlaybackEngine }) {
               <button
                 ref={headlineRef}
                 onClick={() => startEdit('headline')}
-                style={{ left: textLeft, top: headlineTop, width: L.textW * cssScale, fontSize: L.hSize * cssScale, textAlign: L.align }}
+                style={{ left: textLeft, top: headlineTop, width: L.textW * cssScale, fontSize: L.hSize * cssScale, textAlign: L.align, direction: textDir }}
                 className="absolute rounded-[9px] border border-dashed border-transparent font-[family-name:var(--font-space-grotesk)] leading-[1.15] font-bold text-white hover:border-white/40"
               >
                 <HighlightedText text={stripStars(slide.headline) ? slide.headline : ' '} accent={style.colors.accent} />
@@ -187,14 +202,14 @@ export default function Stage({ engine }: { engine: PlaybackEngine }) {
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={commitEdit}
                 onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
-                style={{ left: textLeft, top: subTop - 4, width: L.textW * cssScale, fontSize: L.sSize * cssScale, textAlign: L.align }}
+                style={{ left: textLeft, top: subTop - 4, width: L.textW * cssScale, fontSize: L.sSize * cssScale, textAlign: L.align, direction: textDir }}
                 className="absolute resize-none rounded-[9px] border border-dashed border-white/75 bg-black/[.18] leading-[1.45] text-white/90 outline-none"
                 rows={2}
               />
             ) : (
               <button
                 onClick={() => startEdit('sub')}
-                style={{ left: textLeft, top: subTop, width: L.textW * cssScale, fontSize: L.sSize * cssScale, textAlign: L.align }}
+                style={{ left: textLeft, top: subTop, width: L.textW * cssScale, fontSize: L.sSize * cssScale, textAlign: L.align, direction: textDir }}
                 className="absolute rounded-[9px] border border-dashed border-transparent leading-[1.45] text-white/90 hover:border-white/40"
               >
                 {slide.sub || ' '}

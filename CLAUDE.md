@@ -142,7 +142,11 @@ that code, check out `engine-v2-wip`.
    export additionally catches color drift introduced by the video
    encode/decode pipeline itself — WebCodecs H.264 limited/full-range and
    color-matrix mismatches are a real, easy-to-miss bug class distinct from
-   anything wrong with the drawing code. Run it after any change touching
+   anything wrong with the drawing code. It also checks that all six engine
+   fonts really load and are really used in both preview and export
+   (`src/dev/fontCheck.ts`: glyph-shape comparison of rendered text against
+   the real font vs. its fallbacks) — the Google Fonts URL once 400'd and
+   every font silently fell back to system-ui. Run it after any change touching
    `src/engine/render.ts`, `src/engine/export/`, or any drawing/overlay
    code. If a change is a deliberate visual update, re-calibrate the
    fixtures' expected values against a real render (sample the actual
@@ -434,14 +438,61 @@ windows, data-retention periods, or compliance certifications were
 invented; those are business/legal decisions left as placeholders.
 
 The marketing layout uses `next/font` (self-hosted Bricolage Grotesque +
-Figtree) instead of the `<link>`-tag pattern the editor/login/dev-engine
-layouts use — those need exact `ctx.font` family-name matching for canvas
-rendering, marketing pages don't. `/`, `/privacy`, `/terms`, `/refunds`
+Figtree) rather than the engine's own font CSS (see Engine fonts below) —
+canvas rendering needs exact `ctx.font` family-name matching, marketing
+pages don't. `/`, `/privacy`, `/terms`, `/refunds`
 currently render dynamically rather than fully static, because the nav's
 signed-in check reads cookies — true static generation for those would
 need Next 16's `cacheComponents: true` opt-in, which changes caching
 behavior app-wide (including the API routes) and wasn't enabled without
 discussing it first; dynamic SSR is still fast in practice.
+
+## Engine fonts
+
+Everything the canvas draws uses **self-hosted** fonts — nothing in the
+rendering path loads from an external font host (a Google Fonts URL once
+returned HTTP 400 and every font silently fell back to system-ui in every
+preview and export). `scripts/generate-font-css.mjs` turns the pinned
+Fontsource packages into `src/styles/engine-fonts.css` (the 6 Latin engine
+fonts, under their exact `FONTS` family names, declared at the weight
+instances the engine was designed against) and
+`src/styles/script-fonts/*.css` (Noto Sans per non-Latin script). Re-run it
+after bumping any `@fontsource*` package.
+
+- `src/components/EngineFonts.tsx` imports the engine CSS; render it on
+  every route that draws with the engine (editor, admin, template-preview
+  rendering, dev pages).
+- Script fonts load on demand (`src/components/scriptFontLoader.ts`,
+  dynamic CSS import) — an English-only project never fetches any of them,
+  and a localized one only fetches the unicode-range slices for characters
+  it actually draws. `ensureProjectFonts()` (`src/engine/fonts.ts`) waits
+  for exactly those before any export draws its first frame.
+- `npm run visual-regression` blocks Google's font domains outright and
+  checks all 6 Latin fonts plus Japanese and Arabic by glyph shape in
+  preview and export (`src/dev/fontCheck.ts`).
+
+## Localization
+
+A project's own text is its **source** language; other languages are
+override sets in `project.localization` (`src/engine/localization.ts`),
+keyed per string (app name, intro tagline, each slide's headline/subtitle/
+badge/callout/stickers, story notification/typed text, outro CTA/button/
+small print). `localizeProject(project, locale)` returns a render-time copy
+with that language's text and a `renderLocale` — the renderer itself only
+sees the copy. Under `withTextLocale` (`src/engine/locales.ts`) the engine
+then adds the script's Noto font to every font stack, applies the
+language's font-size override, breaks Chinese/Japanese lines with
+`Intl.Segmenter` (phrase-level refinements and a per-character fallback in
+`src/engine/text.ts`), and lays Arabic/Hebrew out right to left (word
+order, right alignment, 16:9 columns mirrored; device chrome is never
+mirrored). Single-language projects have no `localization` field and render
+exactly as before.
+
+UI: Languages tab (translation table, status per string, per-language text
+size, overflow flags, "Translate all" via `/api/ai/translate` — reviewed
+before anything is applied), the stage's language switcher, and Export →
+All languages (one ZIP, a folder per locale). Plan limits: `maxLanguages`
+and `maxTranslateUsesPerMonth` in `src/lib/plan.ts`.
 
 ## Brand
 

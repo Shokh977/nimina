@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import EngineFonts from '@/components/EngineFonts';
 import { exportVideo } from '@/engine/export';
 import { render } from '@/engine/render';
+import { runFontChecks, type FontCheckResult } from '@/dev/fontCheck';
 import { getRegressionFixtures, previewCanvasSize, type RegressionSample } from '@/dev/visualRegressionFixtures';
 
 // Preview is a direct, uncompressed canvas readback — tight tolerance
@@ -79,6 +81,7 @@ async function decodeExportFrame(blob: Blob, atSeconds: number): Promise<HTMLCan
  */
 export default function VisualRegressionPage() {
   const [results, setResults] = useState<FixtureResult[] | null>(null);
+  const [fonts, setFonts] = useState<FontCheckResult[] | null>(null);
   const [running, setRunning] = useState(false);
 
   const run = useCallback(async () => {
@@ -111,10 +114,19 @@ export default function VisualRegressionPage() {
         out.push({ id: fixture.id, label: fixture.label, preview: [], export: [], error: err instanceof Error ? err.message : String(err) });
       }
     }
+    // Engine fonts: really loaded and really used, in preview and export
+    // (src/dev/fontCheck.ts).
+    let fontResults: FontCheckResult[];
+    try {
+      fontResults = await runFontChecks();
+    } catch (err) {
+      fontResults = [{ font: 'all', weight: 0, faceLoaded: false, preview: {}, export: {}, ink: { w: 0, h: 0 }, pass: false, reason: err instanceof Error ? err.message : String(err) }];
+    }
     setResults(out);
+    setFonts(fontResults);
     setRunning(false);
-    const allPass = out.every((f) => !f.error && [...f.preview, ...f.export].every((s) => s.pass));
-    (window as unknown as { __visualRegressionResults: { allPass: boolean; fixtures: FixtureResult[] } }).__visualRegressionResults = { allPass, fixtures: out };
+    const allPass = out.every((f) => !f.error && [...f.preview, ...f.export].every((s) => s.pass)) && fontResults.every((f) => f.pass);
+    (window as unknown as { __visualRegressionResults: { allPass: boolean; fixtures: FixtureResult[]; fonts: FontCheckResult[] } }).__visualRegressionResults = { allPass, fixtures: out, fonts: fontResults };
   }, []);
 
   useEffect(() => {
@@ -129,6 +141,7 @@ export default function VisualRegressionPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0B0B10', color: '#fff', fontFamily: 'system-ui, sans-serif', padding: 24 }}>
+      <EngineFonts />
       <h1 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px' }}>Visual regression check</h1>
       <p style={{ fontSize: 13, color: '#9BA1B0', margin: '0 0 16px', maxWidth: 640 }}>
         CLAUDE.md rule 7 — two fixtures (the classic multi-slide demo and the story-format demo), sampled in both preview and a real export. Run after any change touching
@@ -154,7 +167,18 @@ export default function VisualRegressionPage() {
               )}
             </div>
           ))}
-          <div style={{ fontWeight: 800, fontSize: 14 }}>{results.every((f) => !f.error && [...f.preview, ...f.export].every((s) => s.pass)) ? '✓ ALL PASS' : '✗ FAILURES ABOVE'}</div>
+          {fonts && (
+            <div style={{ border: '1px solid #26262f', borderRadius: 10, padding: 14 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Engine fonts (glyph-shape IoU vs each reference font)</div>
+              {fonts.map((f) => (
+                <div key={f.font} style={{ fontSize: 12, color: f.pass ? '#7CF0FF' : '#ff8a8a', fontFamily: 'monospace' }}>
+                  {f.pass ? '✓' : '✗'} {f.font} {f.weight}: preview {JSON.stringify(f.preview)}, export {JSON.stringify(f.export)}
+                  {f.reason ? ` — ${f.reason}` : ''}
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontWeight: 800, fontSize: 14 }}>{results.every((f) => !f.error && [...f.preview, ...f.export].every((s) => s.pass)) && (fonts ?? []).every((f) => f.pass) ? '✓ ALL PASS' : '✗ FAILURES ABOVE'}</div>
         </div>
       )}
     </div>

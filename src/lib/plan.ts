@@ -24,6 +24,16 @@ export const PLAN_LIMITS = {
     // vision call, capped separately so a free user can't use one to
     // sidestep the other's limit.
     maxElementDetectUsesPerMonth: 5,
+    // Store-screenshot (still image) export: one store size per export, at
+    // half its pixel dimensions (so not store-ready), watermarked, and no
+    // Custom size. Same client-side caveat as video export (see CLAUDE.md
+    // "Known limitation, by design").
+    imageExport: { maxPresets: 1, scale: 0.5, customSize: false },
+    // Localization: one language per project (its source) — adding a
+    // second is Pro. AI translation is a paid third-party call per use,
+    // capped monthly like AI Director.
+    maxLanguages: 1,
+    maxTranslateUsesPerMonth: 0,
   },
   pro: {
     maxProjects: Infinity,
@@ -31,10 +41,22 @@ export const PLAN_LIMITS = {
     watermark: false,
     maxAiDirectorUsesPerMonth: 30,
     maxElementDetectUsesPerMonth: 50,
+    imageExport: { maxPresets: Infinity, scale: 1, customSize: true },
+    maxLanguages: Infinity,
+    maxTranslateUsesPerMonth: 40,
   },
 } satisfies Record<
   Plan,
-  { maxProjects: number; maxExportResolution: '720p' | '1080p' | '4k'; watermark: boolean; maxAiDirectorUsesPerMonth: number; maxElementDetectUsesPerMonth: number }
+  {
+    maxProjects: number;
+    maxExportResolution: '720p' | '1080p' | '4k';
+    watermark: boolean;
+    maxAiDirectorUsesPerMonth: number;
+    maxElementDetectUsesPerMonth: number;
+    imageExport: { maxPresets: number; scale: number; customSize: boolean };
+    maxLanguages: number;
+    maxTranslateUsesPerMonth: number;
+  }
 >;
 
 export function isPro(plan: Plan): boolean {

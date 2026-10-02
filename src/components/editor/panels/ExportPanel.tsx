@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -12,6 +13,10 @@ import { useEditorStore } from '@/store/editorStore';
 import SectionLabel from '../ui/SectionLabel';
 import SegmentedControl from '../ui/SegmentedControl';
 import { useVideoExport } from '../useVideoExport';
+import ImageExportPanel from './ImageExportPanel';
+
+// Only multilingual projects show this tab; others never load it.
+const BatchExportPanel = dynamic(() => import('./BatchExportPanel'));
 
 function slug(s: string): string {
   return (
@@ -32,6 +37,36 @@ const QUALITY_OPTIONS: Array<[ExportResolution, string]> = [
 const RESOLUTION_RANK: Record<ExportResolution, number> = { '720p': 0, '1080p': 1, '4k': 2 };
 
 export default function ExportPanel() {
+  const [kind, setKind] = useState<'video' | 'images' | 'batch'>('video');
+  const multilingual = (useEditorStore((s) => s.project.localization?.languages.length) ?? 0) > 1;
+  return (
+    <div className="grid grid-cols-1 gap-5">
+      <SegmentedControl
+        options={[
+          ['video', 'Video'],
+          ['images', 'Images'],
+          ...(multilingual ? ([['batch', 'All languages']] as Array<['batch', string]>) : []),
+        ]}
+        value={kind}
+        onChange={setKind}
+      />
+      {/* Both stay mounted so switching tabs mid-render doesn't drop a running export's progress/results. */}
+      <div hidden={kind !== 'video'}>
+        <VideoExportPanel />
+      </div>
+      <div hidden={kind !== 'images'}>
+        <ImageExportPanel />
+      </div>
+      {multilingual && (
+        <div hidden={kind !== 'batch'}>
+          <BatchExportPanel />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VideoExportPanel() {
   const project = useEditorStore((s) => s.project);
   const plan = useEditorStore((s) => s.plan);
   const setQuality = useEditorStore((s) => s.setQuality);
@@ -135,7 +170,7 @@ export default function ExportPanel() {
                   <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
                     <a
                       href={r.outcome.url}
-                      download={`${slug(project.appName)}-promo-${r.format.replace(':', 'x')}.${r.outcome.ext}`}
+                      download={`${slug(project.appName)}${r.locale ? `-${r.locale}` : ''}-promo-${r.format.replace(':', 'x')}.${r.outcome.ext}`}
                       className="rounded-[10px] bg-[#5b4bff] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors duration-[.16s] hover:bg-[#6d5eff]"
                     >
                       Save video

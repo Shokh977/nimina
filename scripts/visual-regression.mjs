@@ -23,6 +23,14 @@ async function main() {
     if (msg.type() === 'error') consoleErrors.push(msg.text());
   });
   page.on('pageerror', (err) => consoleErrors.push(err.message));
+  // The rendering path must not depend on any external font host (an
+  // external Google Fonts link once 400'd and silently broke every font).
+  // Block Google's font domains outright and fail if anything asks for them.
+  const externalFontRequests = [];
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => {
+    externalFontRequests.push(route.request().url());
+    return route.abort();
+  });
 
   console.log(`Loading ${baseUrl}/dev/visual-regression ...`);
   await page.goto(`${baseUrl}/dev/visual-regression`, { waitUntil: 'networkidle' });
@@ -53,6 +61,11 @@ async function main() {
       }
     }
   }
+  console.log('Engine fonts (glyph-shape IoU of the rendered headline vs each reference font — must match "real" and beat every fallback)');
+  const fmt = (o) => Object.entries(o).map(([k, v]) => `${k} ${v}`).join(', ');
+  for (const f of results.fonts ?? []) {
+    console.log(`  [${f.pass ? 'PASS' : 'FAIL'}] ${f.font} ${f.weight}: face ${f.faceLoaded ? 'loaded' : 'NOT loaded'}; preview {${fmt(f.preview)}}; export {${fmt(f.export)}}${f.reason ? ` — ${f.reason}` : ''}`);
+  }
   console.log('');
 
   if (consoleErrors.length > 0) {
@@ -61,7 +74,13 @@ async function main() {
     console.log('');
   }
 
-  if (results.allPass) {
+  if (externalFontRequests.length) {
+    console.log(`External font requests (blocked) — the render path must be self-hosted:`);
+    externalFontRequests.forEach((u) => console.log(`  ${u}`));
+    console.log('');
+  }
+
+  if (results.allPass && !externalFontRequests.length) {
     console.log('ALL PASS');
     process.exit(0);
   } else {

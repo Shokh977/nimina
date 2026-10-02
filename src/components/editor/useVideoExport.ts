@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { exportVideo, type ExportOutcome, type ExportResolution } from '@/engine/export';
+import { localizeProject } from '@/engine/localization';
 import type { Format } from '@/engine/types';
 import { logEvent } from '@/lib/events';
 import { isPro, PLAN_LIMITS } from '@/lib/plan';
@@ -19,6 +20,8 @@ export interface FormatResult {
   progress: number;
   outcome?: ExportOutcome;
   error?: string;
+  /** Set when a translation (not the source language) was exported — goes in the filename. */
+  locale?: string;
 }
 
 /** Renders one video per selected format, sequentially — two concurrent
@@ -32,7 +35,10 @@ export function useVideoExport() {
   const controllerRef = useRef<AbortController | null>(null);
 
   const start = useCallback(async (formats: Format[], requestedResolution: ExportResolution) => {
-    const { project, assets, plan } = useEditorStore.getState();
+    // Exports the language being previewed (localization.ts) — the source
+    // language, or the project as-is when it has no other languages.
+    const { assets, plan, previewLocale } = useEditorStore.getState();
+    const project = localizeProject(useEditorStore.getState().project, previewLocale);
     const musicBuffer = project.music ? (assets.audio[project.music.assetId] ?? null) : null;
 
     // Enforced here (not just disabled in the UI) as a last line of
@@ -46,7 +52,8 @@ export function useVideoExport() {
     const controller = new AbortController();
     controllerRef.current = controller;
     setExporting(true);
-    setResults(formats.map((format) => ({ format, status: 'queued', progress: 0 })));
+    const locale = project.localization && project.renderLocale && project.renderLocale.locale !== project.localization.source ? project.renderLocale.locale : undefined;
+    setResults(formats.map((format) => ({ format, status: 'queued', progress: 0, locale })));
 
     for (const format of formats) {
       if (controller.signal.aborted) break;

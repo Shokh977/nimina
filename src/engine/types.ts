@@ -258,6 +258,11 @@ interface SlideBase {
    * segment, doesn't count toward total duration, never drawn/exported)
    * while staying in the editor's slide list, dimmed. */
   hidden: boolean;
+  /** Still-image export: the slide-local time (seconds, authored speed)
+   * this slide is frozen at when exported as a store screenshot.
+   * undefined/null = auto (export/stills.ts settledTime — the moment the
+   * slide's entrance animation has finished). */
+  stillTime?: number | null;
 }
 
 export interface ImageSlide extends SlideBase {
@@ -394,6 +399,8 @@ export interface StorySlide {
   /** Same semantics as SlideBase.hidden — StorySlide doesn't extend
    * SlideBase, so it needs its own copy of the field. */
   hidden: boolean;
+  /** Same semantics as SlideBase.stillTime. */
+  stillTime?: number | null;
 }
 
 export type Slide = ImageSlide | TextSlide | StorySlide;
@@ -461,6 +468,49 @@ export interface Project {
    * propagates to live preview, the filmstrip and real export from that
    * one source. */
   motionSpeed: number;
+  /** Languages this project ships in (see localization.ts). Absent on
+   * single-language projects — which render exactly as before. */
+  localization?: Localization;
+  /** Set only on the render-time copy localizeProject() returns — which
+   * language's text this project now carries, so the renderer picks its
+   * script font, direction and size override. Never persisted. */
+  renderLocale?: RenderLocale;
+}
+
+/* ---------- localization ---------- */
+
+/** One translated string. `sourceHash` is hashText() of the source text it
+ * was translated from — when the source changes afterwards, the entry is
+ * out of date. `done` = a person (or a reviewed AI pass) has confirmed it;
+ * a freshly cloned entry starts with the source text and done: false. */
+export interface TranslatedString {
+  text: string;
+  sourceHash: string;
+  done: boolean;
+}
+
+export interface LanguageEntry {
+  /** BCP 47 code from LOCALES (src/engine/locales.ts), e.g. 'de', 'ja', 'ar'. */
+  locale: string;
+  /** Multiplies every text size for this language (1 = as designed) — for
+   * languages that run long (German, Russian). */
+  fontScale: number;
+  /** Keyed by string key (localization.ts collectStrings). Empty for the
+   * source language, whose text lives in the project itself. */
+  strings: Record<string, TranslatedString>;
+}
+
+export interface Localization {
+  /** Locale of the text stored in the project itself. */
+  source: string;
+  /** Every language, source included (always first). */
+  languages: LanguageEntry[];
+}
+
+export interface RenderLocale {
+  locale: string;
+  dir: 'ltr' | 'rtl';
+  fontScale: number;
 }
 
 /* ---------- timeline ---------- */
@@ -488,6 +538,10 @@ export interface TextToken {
   t: string;
   hi: boolean;
   w: number;
+  /** Space before this token when it isn't first on its line: the space
+   * width between whitespace-separated words, 0 between the segments of a
+   * Chinese/Japanese run (no spaces in those scripts). */
+  gap: number;
 }
 
 export interface TextLine {
@@ -505,6 +559,12 @@ export interface TextLayout {
   size: number;
   font: string;
   weight: number;
+  /** Word order on the line. */
+  dir: 'ltr' | 'rtl';
+  /** False for scripts whose letters can't be drawn one at a time (joined
+   * Arabic, Devanagari conjuncts, any RTL text) — the letter-drop
+   * animation falls back to per-word 'rise' for those. */
+  splitLetters: boolean;
 }
 
 /* ---------- device geometry ---------- */
@@ -545,7 +605,8 @@ export interface LayoutRegion {
   textW: number;
   hSize: number;
   sSize: number;
-  align: 'center' | 'left';
+  /** 'right' (RTL side-by-side): textX is the column's right edge. */
+  align: 'center' | 'left' | 'right';
   PH: number;
   maxW: number;
   cx: number;

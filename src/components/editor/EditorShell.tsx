@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Project } from '@/engine/types';
@@ -22,11 +23,16 @@ import LookPanel from './panels/LookPanel';
 import MotionPanel from './panels/MotionPanel';
 import SlidesPanel from './panels/SlidesPanel';
 
+// Loaded when the tab is first opened — keeps the localization UI out of
+// the editor's initial bundle for projects that never use it.
+const LanguagesPanel = dynamic(() => import('./panels/LanguagesPanel'));
+
 const PROJECT_TABS = [
   { id: 'scenes', label: 'Slide' },
   { id: 'look', label: 'Look' },
   { id: 'motion', label: 'Motion' },
   { id: 'ai', label: 'AI Director' },
+  { id: 'languages', label: 'Languages' },
   { id: 'export', label: 'Export' },
 ] as const;
 const TEMPLATE_TABS = [
@@ -59,7 +65,7 @@ export default function EditorShell({ userEmail, projectId, projectName, initial
 
   return (
     <EditorShellBody userEmail={userEmail} projectName={projectName} saveStatus={saveStatus} onExportClick={() => setTab('export')}>
-      <div role="tablist" className="flex gap-1 border-b border-white/[.07] p-2 pb-0">
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/[.07] p-2 pb-0">
         {PROJECT_TABS.map((t) => (
           <TabButton key={t.id} active={tab === t.id} label={t.label} onClick={() => setTab(t.id)} />
         ))}
@@ -69,6 +75,7 @@ export default function EditorShell({ userEmail, projectId, projectName, initial
         {tab === 'look' && <LookPanel />}
         {tab === 'motion' && <MotionPanel />}
         {tab === 'ai' && <AiDirectorPanel />}
+        {tab === 'languages' && <LanguagesPanel />}
         {tab === 'export' && <ExportPanel />}
       </div>
     </EditorShellBody>
@@ -139,8 +146,10 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
  * three columns (rail / stage+transport / inspector). Each column scrolls
  * inside itself — the page itself never scrolls. Shared by both modes
  * above; everything about *which* tabs/panels render is passed as
- * children, everything about the shell's own geometry lives here once. */
-function EditorShellBody({
+ * children, everything about the shell's own geometry lives here once.
+ * Exported for dev harnesses that need the real shell without a saved
+ * project behind it (src/app/dev/engine/localization). */
+export function EditorShellBody({
   userEmail,
   projectName,
   saveStatus,

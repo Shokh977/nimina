@@ -3,6 +3,7 @@
  * legacy/promo-studio.html — pure functions, no framework/browser globals
  * beyond Canvas2D and (optionally) Intl.Segmenter.
  */
+import { currentTextLocale } from './locales';
 import type { ImageAsset } from './types';
 
 export const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -72,7 +73,21 @@ export function imgH(img: ImageAsset): number {
   return 'naturalHeight' in img && img.naturalHeight ? img.naturalHeight : img.height;
 }
 
-export const fontStr = (w: number, size: number, name: string) => `${w} ${size}px "${name}", Figtree, system-ui, sans-serif`;
+/** Shared with Stage.tsx's DOM overlay (imported there as a CSS
+ * font-family fallback list) so that if the project's chosen font fails
+ * to load — slow network, blocked request, briefly on first paint — the
+ * DOM overlay falls back to the exact same font the canvas does, instead
+ * of each independently falling back to a different default and visibly
+ * diverging. */
+export const FONT_FALLBACK = 'Figtree, system-ui, sans-serif';
+
+/** A ctx.font string: the project font, then (when rendering a non-Latin
+ * language) that script's Noto font for the glyphs the project font lacks
+ * (locales.ts), then the fallback chain. Unchanged for Latin projects. */
+export const fontStr = (w: number, size: number, name: string) => {
+  const script = currentTextLocale().scriptFamily;
+  return `${w} ${size}px "${name}", ${script ? `"${script}", ` : ''}${FONT_FALLBACK}`;
+};
 
 export const slug = (s: string | null | undefined) =>
   (s || 'app')

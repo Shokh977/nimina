@@ -1,3 +1,4 @@
+import { ensureProjectFonts } from '../fonts';
 import type { AssetMap, Project } from '../types';
 import { exportVideoMediaRecorder } from './mediaRecorderExporter';
 import { outputDimensions } from './resolution';
@@ -7,9 +8,24 @@ import { exportVideoWebCodecs } from './webcodecsExporter';
 
 export * from './types';
 export { exportVideoWebCodecs } from './webcodecsExporter';
+export { ensureProjectFonts } from '../fonts';
 export { exportVideoMediaRecorder } from './mediaRecorderExporter';
 export { supportsWebCodecsExport } from './support';
 export { outputDimensions, qualityToResolution, resolutionToQuality } from './resolution';
+export { STORE_PRESETS, CUSTOM_SIZE_MIN, CUSTOM_SIZE_MAX, type StorePreset, type StorePresetId } from './storePresets';
+export {
+  analyzeLocale,
+  analyzeStill,
+  layoutFamily,
+  renderStill,
+  renderStillBlob,
+  settledTime,
+  slideStillDuration,
+  stillTimeFor,
+  type StillFileFormat,
+  type StillIssue,
+  type LocaleIssue,
+} from './stills';
 
 export interface ExportOutcome extends ExportResult {
   /** Set when the WebCodecs path wasn't used — either unsupported or it
@@ -37,6 +53,7 @@ export async function exportVideo(
 ): Promise<ExportOutcome> {
   const { width, height } = outputDimensions(project, options.resolution);
   const fps = options.fps ?? 30;
+  await ensureProjectFonts(project);
 
   const webCodecsOk = await supportsWebCodecsExport({
     width,

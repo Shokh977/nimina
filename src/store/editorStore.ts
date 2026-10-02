@@ -16,9 +16,11 @@
 import { create } from 'zustand';
 
 import { PRESETS } from '@/engine/constants';
+import { collectStrings, hashText, newLanguageEntry } from '@/engine/localization';
 import { createDefaultProject, normalizeProject } from '@/engine/project';
 import { createImageSlide, createTextSlide } from '@/engine/slides';
 import type {
+  LanguageEntry,
   Action,
   ActionType,
   AssetMap,
@@ -38,7 +40,7 @@ import type {
   TextSlide,
 } from '@/engine/types';
 import { newAssetId } from '@/lib/assetSrc';
-import type { Plan } from '@/lib/plan';
+import { PLAN_LIMITS, type Plan } from '@/lib/plan';
 
 const HISTORY_LIMIT = 80;
 const COMMIT_DEBOUNCE_MS = 450;
@@ -159,6 +161,38 @@ interface EditorState {
   commitNow: () => void;
   undo: () => void;
   redo: () => void;
+
+  /* ---- localization ---- */
+  /** Which language the stage previews (null = the source). UI state —
+   * not part of the project, not in undo history. */
+  previewLocale: string | null;
+  setPreviewLocale: (locale: string | null) => void;
+  /** Turns a single-language project into a localized one whose source is `source`. */
+  enableLocalization: (source: string) => void;
+  /** Changes the source language's code — only while it's the only language. */
+  setSourceLocale: (locale: string) => void;
+  /** Adds `locale` with the source text cloned as its starting overrides.
+   * Returns false (and changes nothing) when the plan's language limit is reached. */
+  addLanguage: (locale: string) => boolean;
+  removeLanguage: (locale: string) => void;
+  /** Sets one string's translation (confirmed, against the current source text). */
+  setTranslation: (locale: string, key: string, text: string) => void;
+  /** Marks one string confirmed (or not) as it stands. */
+  setTranslationDone: (locale: string, key: string, done: boolean) => void;
+  /** Applies several confirmed translations at once (one undo step) — the AI-assist "Apply". */
+  applyTranslations: (locale: string, texts: Record<string, string>) => void;
+  setLanguageFontScale: (locale: string, fontScale: number) => void;
+}
+
+function mapLanguage(p: Project, locale: string, fn: (l: LanguageEntry) => LanguageEntry): Project {
+  const loc = p.localization;
+  if (!loc) return p;
+  return { ...p, localization: { ...loc, languages: loc.languages.map((l) => (l.locale === locale ? fn(l) : l)) } };
+}
+
+/** Current source text of a string key ('' if the string no longer exists). */
+function sourceText(p: Project, key: string): string {
+  return collectStrings(p).find((s) => s.key === key)?.source ?? '';
 }
 
 let nextId = 1;
@@ -292,6 +326,54 @@ export const useEditorStore = create<EditorState>((set, get) => {
     plan: 'free',
     setPlan: (plan) => set({ plan }),
 
+    previewLocale: null,
+    setPreviewLocale: (previewLocale) => set({ previewLocale }),
+    enableLocalization: (source) =>
+      update((p) => (p.localization ? p : { ...p, localization: { source, languages: [{ locale: source, fontScale: 1, strings: {} }] } })),
+    setSourceLocale: (locale) =>
+      update((p) => {
+        const loc = p.localization;
+        if (!loc || loc.languages.length > 1) return p;
+        return { ...p, localization: { source: locale, languages: [{ ...loc.languages[0], locale }] } };
+      }),
+    addLanguage: (locale) => {
+      const { project, plan } = get();
+      const langs = project.localization?.languages ?? [];
+      if (langs.some((l) => l.locale === locale)) return true;
+      if (Math.max(1, langs.length) + 1 > PLAN_LIMITS[plan].maxLanguages) return false;
+      update((p) => {
+        const loc = p.localization ?? { source: 'en', languages: [{ locale: 'en', fontScale: 1, strings: {} }] };
+        return { ...p, localization: { ...loc, languages: [...loc.languages, newLanguageEntry(p, locale)] } };
+      });
+      return true;
+    },
+    removeLanguage: (locale) => {
+      update((p) => {
+        const loc = p.localization;
+        if (!loc || locale === loc.source) return p;
+        return { ...p, localization: { ...loc, languages: loc.languages.filter((l) => l.locale !== locale) } };
+      });
+      if (get().previewLocale === locale) set({ previewLocale: null });
+    },
+    setTranslation: (locale, key, text) =>
+      update((p) => mapLanguage(p, locale, (l) => ({ ...l, strings: { ...l.strings, [key]: { text, sourceHash: hashText(sourceText(p, key)), done: true } } }))),
+    setTranslationDone: (locale, key, done) =>
+      update((p) =>
+        mapLanguage(p, locale, (l) => {
+          const cur = l.strings[key] ?? { text: sourceText(p, key), sourceHash: '', done: false };
+          return { ...l, strings: { ...l.strings, [key]: { ...cur, done, sourceHash: hashText(sourceText(p, key)) } } };
+        }),
+      ),
+    applyTranslations: (locale, texts) =>
+      update((p) =>
+        mapLanguage(p, locale, (l) => {
+          const strings = { ...l.strings };
+          for (const [key, text] of Object.entries(texts)) strings[key] = { text, sourceHash: hashText(sourceText(p, key)), done: true };
+          return { ...l, strings };
+        }),
+      ),
+    setLanguageFontScale: (locale, fontScale) => update((p) => mapLanguage(p, locale, (l) => ({ ...l, fontScale }))),
+
     selectedSceneId: defaultSelection(initialProject),
     selectScene: (id) => set({ selectedSceneId: id }),
 
@@ -306,6 +388,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         canUndo: false,
         canRedo: false,
         selectedSceneId: defaultSelection(normalized),
+        previewLocale: null,
       }));
     },
 

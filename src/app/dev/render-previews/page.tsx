@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { exportVideo } from '@/engine/export';
+import EngineFonts from '@/components/EngineFonts';
 import { TEMPLATES } from '@/engine/templates';
 
 /**
@@ -57,6 +58,7 @@ export default function RenderPreviewsPage() {
 
   return (
     <div style={{ background: '#0B0B10', color: '#fff', padding: 20, fontFamily: 'system-ui, sans-serif', fontSize: 13 }}>
+      <EngineFonts />
       <h1 style={{ fontSize: 16 }}>Render template previews</h1>
       <p style={{ fontSize: 12, color: '#9BA1B0', marginBottom: 12 }}>
         Driven by scripts/render-template-previews.mjs — not meant to be used by hand, though it works standalone too.

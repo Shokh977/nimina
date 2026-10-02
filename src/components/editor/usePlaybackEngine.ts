@@ -1,10 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getSfxEvents, playSfx, scheduleDucking, type SfxEvent } from '@/engine/audio';
 import { FORMATS } from '@/engine/constants';
+import { ensureProjectFonts } from '@/engine/fonts';
+import { localizeProject } from '@/engine/localization';
 import { getTimeline, render } from '@/engine/render';
+import '@/components/scriptFontLoader';
 import { useEditorStore } from '@/store/editorStore';
 
 export interface PlaybackEngine {
@@ -41,7 +44,11 @@ export interface PlaybackEngine {
  * serializable Project.
  */
 export function usePlaybackEngine(): PlaybackEngine {
-  const project = useEditorStore((s) => s.project);
+  const storeProject = useEditorStore((s) => s.project);
+  const previewLocale = useEditorStore((s) => s.previewLocale);
+  // The previewed language's copy (localization.ts) — the stage, playback
+  // and audio all run off it; unchanged for single-language projects.
+  const project = useMemo(() => localizeProject(storeProject, previewLocale), [storeProject, previewLocale]);
   const assets = useEditorStore((s) => s.assets);
   const plan = useEditorStore((s) => s.plan);
 
@@ -56,6 +63,13 @@ export function usePlaybackEngine(): PlaybackEngine {
     assetsRef.current = assets;
     planRef.current = plan;
   }, [project, assets, plan]);
+
+  // Non-Latin languages: fetch the script font for the text on screen (the
+  // loop redraws every frame, so it appears as soon as it arrives).
+  const fontText = project.renderLocale ? JSON.stringify([project.renderLocale.locale, project.font, project.appName, project.scenes.map((s) => (s.kind === 'story' ? '' : s.headline + s.sub + s.badge + s.callout))]) : '';
+  useEffect(() => {
+    if (fontText) void ensureProjectFonts(projectRef.current);
+  }, [fontText]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tRef = useRef(0);

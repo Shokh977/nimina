@@ -9,6 +9,7 @@ import { applyCamera } from './effects';
 import { drawOverlays, drawWatermark } from './overlays';
 import { drawIntro, drawOutro, drawScene, drawTextSlide } from './slides';
 import { getStoryTimeline, renderStory } from './story';
+import { withTextLocale } from './locales';
 import { layoutWords, drawWords } from './text';
 import { drawTransition } from './transitions';
 import type { AssetMap, IntroConfig, OutroConfig, Project, ResolvedStyle, Segment, Slide, SlideStyle, Timeline } from './types';
@@ -74,9 +75,41 @@ export function bgDiffers(a: ResolvedStyle, b: ResolvedStyle): boolean {
  * Draws the project at time `t` (seconds) into `ctx`, scaled by `scale`
  * (e.g. 0.5 for a half-resolution preview, 1 for full-resolution export).
  * `assets` resolves the image ids referenced by scenes/intro/outro.
+ * `options.size` overrides the logical canvas size (default: the format's
+ * own FORMATS w/h) — used by the still-image export to render store sizes
+ * whose aspect ratio isn't one of the video formats (see export/stills.ts);
+ * `project.format` still picks which layout rules apply. `options.fitText`
+ * shrinks image-slide copy to fit above the device (slides.ts
+ * sceneTextLayout) — stills only; video never sets it.
  */
-export function render(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, t: number, scale: number, options?: { watermark?: boolean }): void {
-  const { w: W, h: H } = FORMATS[project.format];
+export function render(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, t: number, scale: number, options?: RenderOptions): void {
+  // A localized copy (localization.ts localizeProject) carries the
+  // language being drawn: its script font, word order and size override
+  // apply for this one synchronous pass (locales.ts withTextLocale).
+  // Right-to-left languages also draw with the canvas in RTL so neutral
+  // characters (punctuation, digits) order correctly inside each string;
+  // textAlign is pinned to 'left' because the canvas default, 'start',
+  // would otherwise flip every unaligned fillText to the right.
+  const rtl = project.renderLocale?.dir === 'rtl';
+  if (rtl) {
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'left';
+  }
+  try {
+    withTextLocale(project.renderLocale, () => renderFrame(ctx, project, assets, t, scale, options));
+  } finally {
+    if (rtl) ctx.direction = 'inherit';
+  }
+}
+
+export interface RenderOptions {
+  watermark?: boolean;
+  size?: { w: number; h: number };
+  fitText?: boolean;
+}
+
+function renderFrame(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, t: number, scale: number, options?: RenderOptions): void {
+  const { w: W, h: H } = options?.size ?? FORMATS[project.format];
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
@@ -125,7 +158,7 @@ export function render(ctx: CanvasRenderingContext2D, project: Project, assets: 
     } else {
       applyCamera(ctx, seg.scene.camera, local, seg.dur, W, H);
       if (seg.scene.kind === 'text') drawTextSlide(ctx, project, seg.scene, st, local, W, H);
-      else drawScene(ctx, project, assets, seg.scene, st, local, W, H);
+      else drawScene(ctx, project, assets, seg.scene, st, local, W, H, options?.fitText);
     }
   }
   ctx.restore();

@@ -8,14 +8,36 @@ import { FONTS, MODELS, SLIDE_DEFAULTS } from './constants';
 import { drawCutoutHollows, drawCutouts } from './cutouts';
 import { drawBadge, drawCallout, drawCounter, drawDevice, drawDevice3D, drawGesture, focusLocal } from './devices';
 import { drawEffect } from './effects';
+import { currentTextLocale } from './locales';
 import { resolveMotion3d } from './pose3d';
 import { drawWords, layoutWords, textDur } from './text';
-import type { AssetMap, EffectBox, Format, FontDef, ImageAsset, ImageSlide, LayoutRegion, ModelKey, Project, ResolvedStyle, Slide, TextPos, TextSlide } from './types';
+import type { AssetMap, ClassicSlide, EffectBox, Format, FontDef, ImageAsset, ImageSlide, LayoutRegion, ModelKey, Project, ResolvedStyle, Slide, TextPos, TextSlide } from './types';
 import { clamp, easeInCubic, easeInOutCubic, easeOutBack, easeOutCubic, fontStr, imgH, imgW, rgba, rr } from './utils';
 
 /* ---------- layout ---------- */
 
+/** Layout for the text locale being rendered (locales.ts): text sizes
+ * scaled by its fontScale, and for right-to-left languages the 16:9
+ * side-by-side layout mirrored — text column on the right, right-aligned,
+ * device on the left. Identical to layoutRules() for the default locale. */
 export function layout(W: number, H: number, format: Format, textPos: TextPos): LayoutRegion {
+  const L = layoutRules(W, H, format, textPos);
+  const loc = currentTextLocale();
+  if (loc.fontScale !== 1) {
+    L.hSize *= loc.fontScale;
+    L.sSize *= loc.fontScale;
+  }
+  if (loc.dir === 'rtl' && L.mode === 'side') {
+    // Mirror both columns; textX becomes the text column's right edge.
+    L.textX = W - L.textX;
+    L.cx = W - L.cx;
+    L.edge = L.edge === 'left' ? 'right' : 'left';
+    L.align = 'right';
+  }
+  return L;
+}
+
+function layoutRules(W: number, H: number, format: Format, textPos: TextPos): LayoutRegion {
   if (format === '9:16') {
     if (textPos === 'bottom') return { mode: 'stack', edge: 'bottom', textX: W / 2, textY: H * 0.725, textW: W * 0.84, hSize: W * 0.083, sSize: W * 0.04, align: 'center', PH: H * 0.6, maxW: W * 0.86, cx: W / 2, cy: H * 0.37 };
     if (textPos === 'center') return { mode: 'stack', edge: 'top', textX: W / 2, textY: H * 0.29, textW: W * 0.84, hSize: W * 0.083, sSize: W * 0.04, align: 'center', PH: H * 0.5, maxW: W * 0.86, cx: W / 2, cy: H * 0.72 };
@@ -44,6 +66,63 @@ export function geom(L: LayoutRegion, model: ModelKey) {
     PH = PW / m.ratio;
   }
   return { PW, PH };
+}
+
+/** Fan layout: default group scale and how far the two side devices sit
+ * from the center one (as a fraction of PW, by device shape). */
+const FAN_SCALE = 0.88;
+/** Side devices keep at least this much clear space from the canvas edge,
+ * as a fraction of the canvas's short side. */
+const FAN_EDGE_MARGIN = 0.04;
+/** How far the spread may shrink (fraction of its default) before the
+ * whole group scales down instead — below this the side devices hide
+ * almost entirely behind the center one. */
+const FAN_MIN_SPREAD = 0.7;
+
+/**
+ * Fan-group geometry that keeps both side devices fully on canvas with a
+ * safe margin, in every format/size: the spread shrinks first, and only
+ * if that isn't enough does the whole group scale down. Side devices are
+ * drawn at 0.84x, rotated +/-0.11rad and offset +/-spread (drawScene), so
+ * each one's horizontal half-extent is its rotated bounding box's.
+ * `fk` is the group scale (FAN_SCALE unless it had to shrink).
+ */
+export function fanGeometry(L: LayoutRegion, model: ModelKey, W: number, H: number, PW: number, PH: number): { spread: number; fk: number } {
+  const base = PW * (MODELS[model].ratio > 1 ? 0.35 : 0.64);
+  const room = Math.min(L.cx, W - L.cx) - Math.min(W, H) * FAN_EDGE_MARGIN;
+  const halfSide = 0.42 * PW * Math.cos(0.11) + 0.42 * PH * Math.sin(0.11);
+  let fk = FAN_SCALE,
+    spread = base;
+  if ((spread + halfSide) * fk > room) spread = Math.max(base * FAN_MIN_SPREAD, room / fk - halfSide);
+  if ((spread + halfSide) * fk > room) fk = room / (spread + halfSide);
+  return { spread, fk };
+}
+
+/** Headline/subtitle layout for an image slide, plus where the block
+ * starts. With `fit`, the sizes shrink (never below MIN_TEXT_FIT of the
+ * layout's) until the block fits the room the layout leaves it: above the
+ * device for top text, down to the canvas bottom for bottom text, the
+ * canvas height for side-by-side. Used on still exports wider than their
+ * layout's own video format, where width-based text sizes would otherwise
+ * run into the device — the device keeps its size; the copy gives way. */
+const MIN_TEXT_FIT = 0.55;
+export function sceneTextLayout(ctx: CanvasRenderingContext2D, scene: ClassicSlide, L: LayoutRegion, font: FontDef, H: number, deviceTop: number, fit: boolean) {
+  const lay = (k: number) => {
+    const hSize = L.hSize * k;
+    const hl = layoutWords(ctx, scene.headline, L.textW, hSize, font.name, font.h);
+    const sl = scene.sub ? layoutWords(ctx, scene.sub, L.textW, L.sSize * k, font.name, font.s) : null;
+    const gap = hSize * 0.35;
+    return { hl, sl, gap, blockH: hl.height + (sl ? gap + sl.height : 0), scale: k };
+  };
+  let r = lay(1);
+  if (fit) {
+    const margin = H * 0.025;
+    const room = L.mode === 'side' ? H * 0.9 : L.edge === 'top' ? deviceTop - margin - (L.textY ?? 0) : H - margin - (L.textY ?? 0);
+    // Re-wrapping at a smaller size can drop a line, so shrink
+    // proportionally and re-measure rather than solving in one step.
+    for (let i = 0; i < 8 && r.blockH > room && r.scale > MIN_TEXT_FIT; i++) r = lay(Math.max(MIN_TEXT_FIT, r.scale * Math.min(0.97, room / r.blockH)));
+  }
+  return { ...r, ty: L.textY != null ? L.textY : (H - r.blockH) / 2 };
 }
 
 /* ---------- fan-layout neighbor lookup ---------- */
@@ -95,7 +174,9 @@ export function drawIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
 
 /* ---------- image / text slide bodies ---------- */
 
-export function drawScene(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, scene: ImageSlide, style: ResolvedStyle, local: number, W: number, H: number): void {
+/** `fitText`: shrink the headline/subtitle to fit above the device (see
+ * sceneTextLayout) — off for video, on for wide still exports. */
+export function drawScene(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, scene: ImageSlide, style: ResolvedStyle, local: number, W: number, H: number, fitText = false): void {
   const L = layout(W, H, project.format, style.textPos),
     dur = scene.dur,
     c = style.colors,
@@ -143,8 +224,9 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
   }
   const scroll = scene.scroll ? easeInOutCubic(clamp((local - 0.9) / Math.max(0.5, dur - 1.7))) : 0;
   const { PW, PH } = geom(L, style.model);
-  const fan = scene.layout === 'fan',
-    fk = fan ? 0.88 : 1;
+  const fan = scene.layout === 'fan';
+  const fanGeo = fan ? fanGeometry(L, style.model, W, H, PW, PH) : null;
+  const fk = fanGeo ? fanGeo.fk : 1;
   const img = scene.imgAssetId ? (assets[scene.imgAssetId] ?? null) : null;
   let fx = 0,
     fy = 0;
@@ -166,7 +248,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
   ctx.scale(S, S);
   if (fan) {
     const se = easeOutCubic(clamp((local - 0.2) / 0.8));
-    const spread = PW * (MODELS[style.model].ratio > 1 ? 0.35 : 0.64);
+    const spread = fanGeo!.spread;
     (
       [
         [-1, neighborImg(project.scenes, scene, -1, assets)],
@@ -246,11 +328,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
     drawCounter(ctx, scene.counter, local, tx, ty, alpha * (1 - zp / 0.3), W, H, style, font);
   }
 
-  const hl = layoutWords(ctx, scene.headline, L.textW, L.hSize, font.name, font.h);
-  const sl = scene.sub ? layoutWords(ctx, scene.sub, L.textW, L.sSize, font.name, font.s) : null;
-  const gap = L.hSize * 0.35;
-  const blockH = hl.height + (sl ? gap + sl.height : 0);
-  const ty = L.textY != null ? L.textY : (H - blockH) / 2;
+  const { hl, sl, gap, blockH, ty } = sceneTextLayout(ctx, scene, L, font, H, L.cy - (PH * fk * (scene.pose3d?.scale ?? 1)) / 2, fitText);
   if (zp > 0) {
     ctx.save();
     ctx.globalAlpha = zp * 0.97;
@@ -276,7 +354,7 @@ export function drawTextSlide(ctx: CanvasRenderingContext2D, project: Project, s
     c = style.colors,
     dur = scene.dur;
   const eo = easeInCubic(clamp((local - (dur - 0.4)) / 0.4));
-  const big = project.format === '16:9' ? H * 0.13 : W * (project.format === '1:1' ? 0.1 : 0.12);
+  const big = (project.format === '16:9' ? H * 0.13 : W * (project.format === '1:1' ? 0.1 : 0.12)) * currentTextLocale().fontScale;
   const hl = layoutWords(ctx, scene.headline, W * 0.84, big, font.name, font.h);
   const sl = scene.sub ? layoutWords(ctx, scene.sub, W * 0.78, big * 0.36, font.name, font.s) : null;
   const gap = big * 0.4,
@@ -296,7 +374,7 @@ export function drawIntro(ctx: CanvasRenderingContext2D, project: Project, asset
     a = 1 - eo;
   const m = Math.min(W, H),
     size = m * 0.24;
-  const nameSize = project.format === '16:9' ? H * 0.11 : W * (project.format === '1:1' ? 0.085 : 0.1);
+  const nameSize = (project.format === '16:9' ? H * 0.11 : W * (project.format === '1:1' ? 0.085 : 0.1)) * currentTextLocale().fontScale;
   const tagSize = nameSize * 0.42;
   const nl = layoutWords(ctx, project.appName || 'Your app', W * 0.84, nameSize, font.name, font.h);
   const tl = project.intro.tagline ? layoutWords(ctx, project.intro.tagline, W * 0.8, tagSize, font.name, font.s) : null;
@@ -323,7 +401,7 @@ export function drawOutro(ctx: CanvasRenderingContext2D, project: Project, asset
     o = project.outro;
   const m = Math.min(W, H),
     size = m * 0.17;
-  const hSize = project.format === '16:9' ? H * 0.09 : W * (project.format === '1:1' ? 0.07 : 0.082);
+  const hSize = (project.format === '16:9' ? H * 0.09 : W * (project.format === '1:1' ? 0.07 : 0.082)) * currentTextLocale().fontScale;
   const bSize = hSize * 0.42,
     smSize = hSize * 0.3;
   const hl = layoutWords(ctx, o.cta, W * 0.82, hSize, font.name, font.h);
