@@ -41,10 +41,10 @@ function GoogleMark() {
 /**
  * Sign in and Create account, one page with a tab switch. Both use the same
  * passwordless methods: Google, or an email carrying a 6-digit code AND a
- * link. The code works from any device (read it on a phone, type it here),
- * which the link alone can't — the PKCE link only completes in the browser
- * that requested it. Requires the Supabase "Magic Link" and "Confirm
- * signup" email templates to include {{ .Token }} (see CLAUDE.md).
+ * link. Both work from any device: the code is typed here, and the link
+ * carries a token hash that /auth/callback verifies server-side. Requires
+ * the Supabase "Magic Link" and "Confirm signup" email templates set up as
+ * described in CLAUDE.md ("Auth email").
  */
 function LoginForm() {
   const params = useSearchParams();
@@ -219,7 +219,7 @@ function LoginForm() {
               {busy ? 'Checking…' : 'Continue'}
             </button>
           </form>
-          <p className="mt-3 text-[12.5px] text-neutral-500 dark:text-neutral-400">Or click the link in the email — on this device and in this browser.</p>
+          <p className="mt-3 text-[12.5px] text-neutral-500 dark:text-neutral-400">Or just click the link in the email.</p>
           <div className="mt-4 flex items-center justify-between text-[13px] font-semibold">
             <button type="button" onClick={() => sendCode()} disabled={busy || cooldown > 0} className="text-indigo-600 disabled:text-neutral-400 dark:text-indigo-400">
               {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}

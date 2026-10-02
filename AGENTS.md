@@ -522,17 +522,33 @@ any source SVG, via `scripts/generate-brand-assets.mjs`).
   keep the two in sync if the mark ever changes.
 - **Auth email**: configured in the Supabase dashboard (Authentication →
   Email Templates), not in this repo. `/login` (src/app/login/page.tsx)
-  signs in with a **6-digit code typed on the page or the link** — the
-  code works from any device, while the PKCE link only completes in the
-  browser that requested it. So **both the "Magic Link" and "Confirm
-  signup" templates must include `{{ .Token }}`** (Supabase uses Confirm
-  signup for a brand-new address); without it the page asks for a code the
-  email doesn't contain. Suggested copy for both:
-  - Subject: `Your Nimina sign-in code: {{ .Token }}`
-  - Body: `Your sign-in code is {{ .Token }} — enter it on the Nimina
-    page you came from. Or click this link in the same browser:
-    {{ .ConfirmationURL }}. The code and link expire shortly and work once.
-    If you didn't request this, you can ignore this email.`
+  takes a **6-digit code typed on the page, or the link** — and both must
+  work from any device (people request on a laptop and open mail on a
+  phone). So in **both the "Magic Link" and "Confirm signup" templates**
+  (Supabase uses Confirm signup for a brand-new address):
+  - include `{{ .Token }}` (the code), and
+  - build the link as `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email`
+    — NOT the default `{{ .ConfirmationURL }}`, which uses the PKCE flow and
+    only completes in the browser that requested it ("PKCE code verifier
+    not found in storage"). `/auth/callback` verifies the token hash
+    server-side. `{{ .RedirectTo }}` is the app's
+    `/auth/callback?next=…` URL, so it must be in Authentication → URL
+    Configuration → Redirect URLs (otherwise Supabase swaps in the bare
+    Site URL and the link breaks).
+
+  Suggested copy for both templates (paste exactly — keep each `{{ … }}`
+  on one line):
+
+  Subject:
+  ```
+  Your Nimina sign-in code: {{ .Token }}
+  ```
+  Body (HTML):
+  ```html
+  <p>Your sign-in code is <b>{{ .Token }}</b> — enter it on the Nimina page you came from.</p>
+  <p>Or <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">sign in with this link</a> on any device.</p>
+  <p>The code and link expire shortly and work once. If you didn't request this, you can ignore this email.</p>
+  ```
 
 <!-- BEGIN:nextjs-agent-rules -->
 
