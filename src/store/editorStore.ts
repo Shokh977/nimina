@@ -128,10 +128,13 @@ interface EditorState {
   updateAudioClip: (clipId: string, patch: Partial<Omit<AudioClip, 'id'>>) => void;
   removeAudioClip: (clipId: string) => void;
   setDucking: (v: boolean) => void;
-  /** What the inspector shows instead of the tabs: an audio clip's settings,
-   * the "add music" browser, or nothing (the tabs). UI state, not undoable. */
-  audioSelection: string | 'add' | null;
-  selectAudio: (sel: string | 'add' | null) => void;
+  /** The audio clip whose settings replace the inspector's tabs (null =
+   * the tabs). UI state, not undoable. */
+  audioSelection: string | null;
+  selectAudio: (clipId: string | null) => void;
+  /** The music library drawer (adding or replacing music). UI state. */
+  musicDrawerOpen: boolean;
+  setMusicDrawerOpen: (open: boolean) => void;
 
   /* ---- slides ---- */
   registerImage: (assetId: string, image: ImageAsset) => void;
@@ -413,6 +416,8 @@ export const useEditorStore = create<EditorState>((set, get) => {
     selectScene: (id) => set({ selectedSceneId: id, audioSelection: null }),
     audioSelection: null,
     selectAudio: (audioSelection) => set({ audioSelection }),
+    musicDrawerOpen: false,
+    setMusicDrawerOpen: (musicDrawerOpen) => set({ musicDrawerOpen }),
 
     loadProject: (project, projectId, assets) => {
       const normalized = normalizeProject(project);
@@ -426,6 +431,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         canRedo: false,
         selectedSceneId: defaultSelection(normalized),
         audioSelection: null,
+        musicDrawerOpen: false,
         previewLocale: null,
       }));
     },

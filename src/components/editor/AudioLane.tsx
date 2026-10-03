@@ -44,6 +44,8 @@ const round = (v: number, step = 0.05) => Math.round(v / step) * step;
 export default function AudioLane({ project, total, pxPerSecond, segments, t }: { project: Project; total: number; pxPerSecond: number; segments: Segment[]; t: number }) {
   const buffers = useEditorStore((s) => s.assets.audio);
   const selection = useEditorStore((s) => s.audioSelection);
+  const drawerOpen = useEditorStore((s) => s.musicDrawerOpen);
+  const setMusicDrawerOpen = useEditorStore((s) => s.setMusicDrawerOpen);
   const selectAudio = useEditorStore((s) => s.selectAudio);
   const updateAudioClip = useEditorStore((s) => s.updateAudioClip);
   const removeAudioClip = useEditorStore((s) => s.removeAudioClip);
@@ -58,8 +60,8 @@ export default function AudioLane({ project, total, pxPerSecond, segments, t }: 
         type="button"
         data-audio-add
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => selectAudio('add')}
-        className={`absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed text-[12px] font-semibold transition-colors ${selection === 'add' ? 'border-[#8b7dff]/70 bg-[#5b4bff]/[.12] text-[#cfc8ff]' : 'border-white/[.12] text-[#9aa1af] hover:border-[#8b7dff]/50 hover:text-[#cfc8ff]'}`}
+        onClick={() => setMusicDrawerOpen(true)}
+        className={`absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 rounded-[10px] border-2 border-dashed text-[12px] font-semibold transition-colors ${drawerOpen ? 'border-[#8b7dff]/70 bg-[#5b4bff]/[.12] text-[#cfc8ff]' : 'border-white/[.12] text-[#9aa1af] hover:border-[#8b7dff]/50 hover:text-[#cfc8ff]'}`}
         style={{ height: AUDIO_LANE_H }}
       >
         ＋ Add music

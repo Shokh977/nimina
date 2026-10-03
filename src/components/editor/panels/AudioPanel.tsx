@@ -1,14 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-
 import { clipWindow, findClip } from '@/engine/audio/clips';
 import { getTimeline } from '@/engine/render';
 import { useEditorStore } from '@/store/editorStore';
 import RangeInput from '../ui/RangeInput';
 import SectionLabel from '../ui/SectionLabel';
 import ToggleRow from '../ui/ToggleRow';
-import MusicBrowser from './MusicBrowser';
 
 function mmss(s: number): string {
   const m = Math.floor(s / 60);
@@ -17,8 +14,8 @@ function mmss(s: number): string {
 
 /**
  * What the inspector shows in place of its tabs while an audio clip is
- * selected on the timeline (or "＋ Add music" was clicked): the clip's
- * settings, or the music browser. Every value here can also be dragged on
+ * selected on the timeline: the clip's settings (Replace opens the music
+ * drawer, MusicDrawer.tsx). Every value here can also be dragged on
  * the timeline; the sliders are the precise (and the phone's) way.
  */
 export default function AudioPanel({ onClose, embedded = false }: { onClose?: () => void; /** Inside a titled sheet with its own close button: no header here. */ embedded?: boolean }) {
@@ -29,9 +26,9 @@ export default function AudioPanel({ onClose, embedded = false }: { onClose?: ()
   const updateAudioClip = useEditorStore((s) => s.updateAudioClip);
   const removeAudioClip = useEditorStore((s) => s.removeAudioClip);
   const setDucking = useEditorStore((s) => s.setDucking);
-  const [replacing, setReplacing] = useState(false);
+  const setMusicDrawerOpen = useEditorStore((s) => s.setMusicDrawerOpen);
 
-  const clip = selection && selection !== 'add' ? findClip(project, selection) : null;
+  const clip = selection ? findClip(project, selection) : null;
   const close = () => {
     selectAudio(null);
     onClose?.();
@@ -47,15 +44,7 @@ export default function AudioPanel({ onClose, embedded = false }: { onClose?: ()
       </div>
     );
 
-  if (!clip) {
-    return (
-      <div>
-        {header('Add music')}
-        <MusicBrowser />
-        <p className="mt-3 text-[12px] leading-snug text-[#767e8d]">It goes on the timeline under your slides, where you can trim it, choose which part of the song plays, and set fades.</p>
-      </div>
-    );
-  }
+  if (!clip) return null;
 
   const total = getTimeline(project).total;
   const buffer = buffers[clip.assetId];
@@ -76,18 +65,13 @@ export default function AudioPanel({ onClose, embedded = false }: { onClose?: ()
               {clip.bpm ? ` · ${clip.bpm} BPM` : ''}
             </div>
           </div>
-          <button type="button" onClick={() => setReplacing((v) => !v)} aria-expanded={replacing} className="shrink-0 text-[12.5px] font-semibold text-[#8b7dff] hover:text-[#a89bff]">
+          <button type="button" onClick={() => setMusicDrawerOpen(true)} className="shrink-0 text-[12.5px] font-semibold text-[#8b7dff] hover:text-[#a89bff]">
             Replace
           </button>
           <button type="button" onClick={() => removeAudioClip(clip.id)} className="shrink-0 text-[12.5px] font-semibold text-[#ff8f76] hover:text-[#ffb3a3]">
             Remove
           </button>
         </div>
-        {replacing && (
-          <div className="mt-3 rounded-[12px] border border-white/[.08] p-3">
-            <MusicBrowser />
-          </div>
-        )}
       </div>
 
       <RangeInput min={0} max={1} step={0.05} value={clip.volume} onChange={(volume) => set({ volume })} label="Volume" valueLabel={`${Math.round(clip.volume * 100)}%`} />

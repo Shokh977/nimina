@@ -21,6 +21,7 @@ import { usePlaybackEngine } from './usePlaybackEngine';
 import { useTemplatePersistence } from './useTemplatePersistence';
 import AiDirectorPanel from './panels/AiDirectorPanel';
 import AudioPanel from './panels/AudioPanel';
+import MusicDrawer from './panels/MusicDrawer';
 import ExportPanel from './panels/ExportPanel';
 import LookPanel from './panels/LookPanel';
 import MotionPanel from './panels/MotionPanel';
@@ -57,6 +58,7 @@ type ProjectTabId = (typeof PROJECT_TABS)[number]['id'];
 type TemplateTabId = (typeof TEMPLATE_TABS)[number]['id'];
 
 const RAIL_MIN = 160;
+const MUSIC_DRAWER_W = 400;
 const RAIL_MAX = 360;
 const INSPECTOR_MIN = 260;
 const INSPECTOR_MAX = 480;
@@ -188,6 +190,7 @@ export function EditorShellBody({
 }) {
   const engine = usePlaybackEngine();
   const audioSelection = useEditorStore((s) => s.audioSelection);
+  const musicDrawerOpen = useEditorStore((s) => s.musicDrawerOpen);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
 
@@ -264,9 +267,16 @@ export function EditorShellBody({
         <Header userEmail={userEmail} projectName={projectName} saveStatus={saveStatus} engine={engine} onExportClick={() => onTabChange('export')} />
 
         <div className="flex min-h-0 flex-1">
-          <aside className="min-h-0 min-w-0 shrink-0 overflow-y-auto [scrollbar-gutter:stable]" style={{ width: railWidth }}>
-            <SlideRail />
-          </aside>
+          {musicDrawerOpen ? (
+            // The music drawer takes the rail's place (wider), so the stage and timeline stay in view while browsing.
+            <aside className="min-h-0 min-w-0 shrink-0 border-r border-white/[.07]" style={{ width: Math.max(railWidth, MUSIC_DRAWER_W) }}>
+              <MusicDrawer />
+            </aside>
+          ) : (
+            <aside className="min-h-0 min-w-0 shrink-0 overflow-y-auto [scrollbar-gutter:stable]" style={{ width: railWidth }}>
+              <SlideRail />
+            </aside>
+          )}
 
           <ResizeHandle label="Resize the slide rail" onDragStart={onRailDragStart} onDrag={onRailDrag} />
 

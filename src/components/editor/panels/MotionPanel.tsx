@@ -27,6 +27,7 @@ export default function MotionPanel() {
   const setTransition = useEditorStore((s) => s.setTransition);
   const setMotionSpeed = useEditorStore((s) => s.setMotionSpeed);
   const selectAudio = useEditorStore((s) => s.selectAudio);
+  const setMusicDrawerOpen = useEditorStore((s) => s.setMusicDrawerOpen);
   const music = useEditorStore((s) => musicClip(s.project));
 
   const activePresetId = MOTION_PRESETS.find((p) => p.textAnim === project.textAnim && p.transition === project.transition)?.id ?? null;
@@ -72,7 +73,7 @@ export default function MotionPanel() {
         <SectionLabel>Music</SectionLabel>
         <button
           type="button"
-          onClick={() => selectAudio(music?.id ?? 'add')}
+          onClick={() => (music ? selectAudio(music.id) : setMusicDrawerOpen(true))}
           className="w-full rounded-[10px] border border-white/[.08] bg-white/[.03] px-3 py-2.5 text-left text-[13px] text-[#c9cdd8] hover:border-[#8b7dff]/40 hover:bg-[#5b4bff]/[.08]"
         >
           {music ? <>♪ {music.name} <span className="text-[#8b7dff]">· Edit</span></> : <span className="font-semibold">＋ Add music</span>}

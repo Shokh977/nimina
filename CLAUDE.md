@@ -737,10 +737,16 @@ enforced by NOT NULL/CHECK constraints (migration 0022): we redistribute
 these files. Tracks can be deactivated (hidden from users, still playable
 in projects that use them), reordered, made free/Pro, or deleted.
 
-Editor: the music browser (`MusicBrowser.tsx`, opened from the timeline's
-"＋ Add music" or Replace) has Library (mood/genre filters, waveform
-preview; Pro-only tracks are greyed with an upgrade prompt for free users,
-who can still preview) and Upload your own. A picked library track becomes
+Editor: the music drawer (`MusicDrawer.tsx`, opened from the timeline's
+"＋ Add music", the Audio panel's Replace or Motion; it takes the slide
+rail's place on a computer, full screen on a phone, Esc closes) has Library
+and Upload your own. The library is queried page by page (25 at a time,
+infinite scroll) by `searchMusicLibrary()` in
+`src/lib/supabase/musicLibrary.ts`: search over title/artist/mood/genre
+(ilike), mood chips and genre (most common first, from
+`musicLibraryFacets()`), sort, "Free only" for free users, and a Recently
+used list (last 8 picks, per browser in localStorage). Pro-only tracks are
+greyed with an upgrade prompt for free users, who can still preview. A picked library track becomes
 a clip with assetId `library:<path>` and its decoded buffer, so preview and
 export treat it exactly like an upload. Like the other plan gates this is
 enforced in the browser (the files are public).

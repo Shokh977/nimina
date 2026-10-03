@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { musicClip } from '@/engine/audio/clips';
 import { useEditorStore } from '@/store/editorStore';
 import AudioPanel from '../panels/AudioPanel';
+import MusicDrawer from '../panels/MusicDrawer';
 import type { EditorTab } from '../EditorShell';
 import SaveStatusBadge from '../SaveStatusBadge';
 import Stage from '../Stage';
@@ -75,6 +76,7 @@ export default function MobileEditor({
   const secondary = tabs.filter((t) => t.secondary);
 
   const audioSelection = useEditorStore((s) => s.audioSelection);
+  const musicDrawerOpen = useEditorStore((s) => s.musicDrawerOpen);
   const selectAudio = useEditorStore((s) => s.selectAudio);
   // Selecting music (the strip's ♪ chip, or Motion's music row) opens its settings as a section.
   useEffect(() => {
@@ -95,7 +97,7 @@ export default function MobileEditor({
   };
   // Landscape always shows a section.
   const shown: Section | null = landscape ? (section ?? activeTab) : section;
-  const sectionLabel = shown === 'slides' ? 'Slides' : shown === 'audio' ? (audioSelection === 'add' ? 'Add music' : 'Music') : (tabs.find((t) => t.id === shown)?.label ?? '');
+  const sectionLabel = shown === 'slides' ? 'Slides' : shown === 'audio' ? 'Music' : (tabs.find((t) => t.id === shown)?.label ?? '');
   const closeSection = () => {
     if (shown === 'audio') selectAudio(null);
     setSection(null);
@@ -154,6 +156,7 @@ export default function MobileEditor({
           )}
         </>
       )}
+      {musicDrawerOpen && <MusicDrawer fullScreen />}
     </div>
   );
 }
@@ -410,9 +413,10 @@ function MusicChip() {
   const music = useEditorStore((s) => musicClip(s.project));
   const selected = useEditorStore((s) => s.audioSelection !== null);
   const selectAudio = useEditorStore((s) => s.selectAudio);
+  const setMusicDrawerOpen = useEditorStore((s) => s.setMusicDrawerOpen);
   return (
     <button
-      onClick={() => selectAudio(music?.id ?? 'add')}
+      onClick={() => (music ? selectAudio(music.id) : setMusicDrawerOpen(true))}
       aria-label={music ? `Music: ${music.name}` : 'Add music'}
       aria-current={selected}
       className={`flex h-[60px] max-w-[110px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[10px] border-2 px-2 ${selected ? 'border-[#8b7dff]' : music ? 'border-[#2fb6a0]/50' : 'border-dashed border-white/[.25]'} ${music ? 'bg-[#2fb6a0]/[.16]' : ''} active:bg-white/[.08]`}
