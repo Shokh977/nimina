@@ -70,7 +70,12 @@ export class R2 {
   async put(bucket: string, key: string, body: BodyInit, contentType: string, cacheControl?: string): Promise<void> {
     const headers: Record<string, string> = { 'content-type': contentType };
     if (cacheControl) headers['cache-control'] = cacheControl;
-    const res = await this.aws.fetch(this.objectUrl(bucket, key), { method: 'PUT', body, headers });
+    // Sign, then send the bytes with fetch directly: R2 requires a
+    // Content-Length, and a body passed through aws4fetch's Request goes out
+    // as a stream without one (under Next.js's server fetch).
+    const signed = await this.aws.sign(this.objectUrl(bucket, key), { method: 'PUT', headers });
+    const bytes = typeof body === 'string' ? new TextEncoder().encode(body) : body;
+    const res = await fetch(signed.url, { method: 'PUT', headers: signed.headers, body: bytes });
     if (!res.ok) throw new Error(`R2 PUT ${key} failed: ${res.status} ${await res.text()}`);
   }
 

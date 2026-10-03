@@ -64,6 +64,15 @@ export interface ColorPreset extends Colors {
   name: string;
 }
 
+/** An uploaded font a project uses (customFonts.ts). */
+export interface CustomFontRef {
+  id: string;
+  /** The family name read from the font file — shown in the UI. */
+  family: string;
+  weight: number;
+  italic?: boolean;
+}
+
 export interface FontDef {
   name: string;
   /** headline weight */
@@ -132,6 +141,8 @@ export interface SlideStyle {
   textPos?: TextPos;
   model?: ModelKey;
   fcolor?: FrameColorId;
+  /** Typeface override: '0'…'5' (built-in) or 'u:<id>' (uploaded) — see customFonts.ts. */
+  font?: string;
 }
 
 /** The project-wide defaults resolved against a slide's overrides. */
@@ -145,6 +156,7 @@ export interface ResolvedStyle {
   textPos: TextPos;
   model: ModelKey;
   fcolor: FrameColorId;
+  font: FontDef;
 }
 
 /* ---------- cutouts (pop-out screenshot elements) ---------- */
@@ -446,6 +458,10 @@ export interface Project {
   colors: Colors;
   /** index into FONTS */
   font: number;
+  /** An uploaded font as the project default instead of FONTS[font] (customFonts.ts). */
+  customFont?: string;
+  /** The uploaded fonts this project references. */
+  customFonts?: CustomFontRef[];
   model: ModelKey;
   fcolor: FrameColorId;
   bgPattern: BgPattern;

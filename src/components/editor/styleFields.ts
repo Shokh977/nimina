@@ -5,14 +5,15 @@
  * it's presentation metadata (labels, which fields apply to which slide
  * kind) rather than rendering data.
  */
-import { BG_PATTERNS, FCOLORS, HL_STYLES, MODELS, PRESETS, TEXT_ANIMS, TRANSITIONS } from '@/engine/constants';
+import { BG_PATTERNS, FCOLORS, FONTS, HL_STYLES, MODELS, PRESETS, TEXT_ANIMS, TRANSITIONS } from '@/engine/constants';
 import type { Project, SlideStyle } from '@/engine/types';
 
 export type StyleFieldKey = keyof SlideStyle;
 
 export interface StyleFieldDef {
   label: string;
-  options: () => Array<[string, string]>;
+  /** Gets the project for options that depend on it (the uploaded typefaces). */
+  options: (project?: Project) => Array<[string, string]>;
 }
 
 export const STYLE_FIELDS: Record<StyleFieldKey, StyleFieldDef> = {
@@ -37,19 +38,23 @@ export const STYLE_FIELDS: Record<StyleFieldKey, StyleFieldDef> = {
   },
   model: { label: 'Device', options: () => Object.entries(MODELS).map(([k, m]) => [k, m.label]) },
   fcolor: { label: 'Device color', options: () => FCOLORS.map((f) => [f.id, f.label]) },
+  font: {
+    label: 'Typeface',
+    options: (project) => [...FONTS.map((f, i): [string, string] => [String(i), f.label]), ...(project?.customFonts ?? []).map((f): [string, string] => [`u:${f.id}`, `${f.family} (uploaded)`])],
+  },
 };
 
-export const KEYS_IMAGE: StyleFieldKey[] = ['theme', 'textAnim', 'hlStyle', 'transition', 'bgPattern', 'shapes', 'textPos', 'model', 'fcolor'];
-export const KEYS_TEXT: StyleFieldKey[] = ['theme', 'textAnim', 'hlStyle', 'transition', 'bgPattern', 'shapes'];
-export const KEYS_IO: StyleFieldKey[] = ['theme', 'textAnim', 'hlStyle', 'transition', 'bgPattern', 'shapes'];
+export const KEYS_IMAGE: StyleFieldKey[] = ['theme', 'textAnim', 'hlStyle', 'transition', 'bgPattern', 'shapes', 'textPos', 'model', 'fcolor', 'font'];
+export const KEYS_TEXT: StyleFieldKey[] = ['theme', 'textAnim', 'hlStyle', 'transition', 'bgPattern', 'shapes', 'font'];
+export const KEYS_IO: StyleFieldKey[] = ['theme', 'textAnim', 'hlStyle', 'transition', 'bgPattern', 'shapes', 'font'];
 /** Story slides have no headline text, so textAnim/hlStyle/textPos don't
  * apply — but they still show a device frame and sit on the background. */
 export const KEYS_STORY: StyleFieldKey[] = ['theme', 'transition', 'bgPattern', 'shapes', 'model', 'fcolor'];
 
 /** What a style field currently resolves to, for the "Default (...)" option label. */
 export function defaultLabel(project: Project, key: StyleFieldKey): string {
-  const list = STYLE_FIELDS[key].options();
-  const v = key === 'theme' ? String(project.preset) : key === 'shapes' ? (project.shapes ? 'on' : 'off') : String(project[key as keyof Project]);
+  const list = STYLE_FIELDS[key].options(project);
+  const v = key === 'theme' ? String(project.preset) : key === 'shapes' ? (project.shapes ? 'on' : 'off') : key === 'font' ? (project.customFont ? `u:${project.customFont}` : String(project.font)) : String(project[key as keyof Project]);
   const f = list.find((o) => o[0] === v);
   return f ? f[1] : 'Custom';
 }

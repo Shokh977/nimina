@@ -1,5 +1,6 @@
 'use client';
 
+import FontCoverageWarnings from './FontCoverageWarnings';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
@@ -156,6 +157,7 @@ export default function LanguagesPanel() {
 
   return (
     <div className="grid grid-cols-1 gap-5">
+      <FontCoverageWarnings />
       <div>
         <SectionLabel>Source language</SectionLabel>
         <select

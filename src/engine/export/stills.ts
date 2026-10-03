@@ -13,7 +13,7 @@
  * canvas straight to the target pixel size — drawn at full resolution,
  * never rendered small and upscaled.
  */
-import { FONTS, FORMATS } from '../constants';
+import { FORMATS } from '../constants';
 import { localizeProject } from '../localization';
 import { withTextLocale } from '../locales';
 import { render, resolveStyle } from '../render';
@@ -76,7 +76,7 @@ function settledTimeIn(project: Project, slide: Slide): number {
     return clamp(t, 0, Math.max(0, tl.total - 0.01));
   }
   const style = resolveStyle(project, slide);
-  const font = FONTS[project.font];
+  const font = style.font;
   const ctx = getMeasureCtx();
   // Word counts/char counts don't depend on wrap width or size, which is
   // all textDur reads.
@@ -166,7 +166,7 @@ function measure(project: Project, slide: ClassicSlide, W: number, H: number, fa
 function measureIn(project: Project, slide: ClassicSlide, W: number, H: number, family: Format, fitText: boolean): LayoutMetrics {
   const ctx = getMeasureCtx();
   const style = resolveStyle(project, slide);
-  const font = FONTS[project.font];
+  const font = style.font;
   const m: LayoutMetrics = { device: 0, fan: 0, overlap: 0, textOverflow: 0 };
 
   if (slide.kind === 'text') {
@@ -280,15 +280,17 @@ function measureCards(project: Project): { intro: number; outro: number } {
   return withTextLocale(project.renderLocale, () => {
     const ctx = getMeasureCtx();
     const { w: W, h: H } = FORMATS[project.format];
-    const font = FONTS[project.font];
+    // Each card in its own typeface (a style override can differ from the project's).
+    const font = resolveStyle(project, project.intro).font;
+    const ofont = resolveStyle(project, project.outro).font;
     const scale = project.renderLocale?.fontScale ?? 1;
     const nameSize = (project.format === '16:9' ? H * 0.11 : W * (project.format === '1:1' ? 0.085 : 0.1)) * scale;
     const nl = layoutWords(ctx, project.appName || 'Your app', W * 0.84, nameSize, font.name, font.h);
     const tl = project.intro.tagline ? layoutWords(ctx, project.intro.tagline, W * 0.8, nameSize * 0.42, font.name, font.s) : null;
     const intro = Math.max((widest(nl) - W * 0.84) / W, tl ? (widest(tl) - W * 0.8) / W : 0, 0);
     const hSize = (project.format === '16:9' ? H * 0.09 : W * (project.format === '1:1' ? 0.07 : 0.082)) * scale;
-    const hl = layoutWords(ctx, project.outro.cta, W * 0.82, hSize, font.name, font.h);
-    ctx.font = fontStr(font.h === 400 ? 400 : 700, hSize * 0.42, font.name);
+    const hl = layoutWords(ctx, project.outro.cta, W * 0.82, hSize, ofont.name, ofont.h);
+    ctx.font = fontStr(ofont.h === 400 ? 400 : 700, hSize * 0.42, ofont.name);
     const bw = project.outro.button ? ctx.measureText(project.outro.button).width + hSize * 0.42 * 2.4 : 0;
     const outro = Math.max((widest(hl) - W * 0.82) / W, (bw - W * 0.9) / W, 0);
     return { intro, outro };

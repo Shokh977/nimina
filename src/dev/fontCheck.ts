@@ -16,12 +16,21 @@
  * beats every fallback by >= MIN_MARGIN, and document.fonts reports the
  * face as loaded.
  *
+ * Plus an uploaded font (customFonts.ts): a test file registered through
+ * the same FontFace code the app uses for real uploads
+ * (customFontLoader.ts registerFontFace), set as the project typeface and
+ * loaded by ensureProjectFonts before the export — the same path a Pro
+ * user's font takes.
+ *
  * Plus one case per non-Latin script that matters most (Japanese, Arabic):
  * a localized project whose text must come out in the self-hosted Noto
  * script font (locales.ts) — not the system font the browser would pick if
  * that font failed to load.
  */
 import '@/components/scriptFontLoader';
+import { registerFontFace } from '@/components/customFontLoader';
+import { customFontDef } from '@/engine/customFonts';
+import { setCustomFontLoader } from '@/engine/fonts';
 import { exportVideo } from '@/engine/export';
 import { localizeProject } from '@/engine/localization';
 import { SCRIPT_FAMILIES } from '@/engine/locales';
@@ -29,7 +38,7 @@ import { FONTS, FORMATS, PRESETS } from '@/engine/constants';
 import { createDefaultProject } from '@/engine/project';
 import { render } from '@/engine/render';
 import { createTextSlide } from '@/engine/slides';
-import type { Project } from '@/engine/types';
+import type { CustomFontRef, FontDef, Project } from '@/engine/types';
 import { FONT_FALLBACK } from '@/engine/utils';
 
 // Short enough that the widest font (Syne 800) still fits the text slide.
@@ -135,7 +144,13 @@ function faceLoaded(family: string, weight: number): boolean {
   return [...document.fonts].some((f) => f.family.replace(/["']/g, '') === family && f.status === 'loaded' && (f.weight === String(weight) || /\d+ \d+/.test(f.weight)));
 }
 
+/** A stand-in for a user's upload (Noto Sans, a variable font not among
+ * the built-ins; public/dev-fixtures/upload-test.woff2). */
+const UPLOAD: CustomFontRef = { id: 'vr-upload-test', family: 'Noto Sans (test upload)', weight: 800 };
+const UPLOAD_URL = '/dev-fixtures/upload-test.woff2';
+
 interface FontCase {
+  /** Index into FONTS, or -1 for the uploaded test font. */
   fontIndex: number;
   word: string;
   /** Set for script-font cases: the project is localized into it. */
@@ -143,6 +158,7 @@ interface FontCase {
 }
 const CASES: FontCase[] = [
   ...FONTS.map((_, fontIndex) => ({ fontIndex, word: WORD })),
+  { fontIndex: -1, word: WORD },
   // Real promo copy words: "daily habits" / "your habits".
   { fontIndex: 0, word: '毎日の習慣', locale: 'ja' },
   { fontIndex: 0, word: 'عاداتك', locale: 'ar' },
@@ -169,7 +185,8 @@ function projectFor({ fontIndex, word, locale }: FontCase): Project {
 function projectBase(fontIndex: number): Project {
   return {
     ...createDefaultProject(),
-    font: fontIndex,
+    font: Math.max(0, fontIndex),
+    ...(fontIndex === -1 ? { customFont: UPLOAD.id, customFonts: [UPLOAD] } : {}),
     preset: 3,
     colors: { ...PRESETS[3] },
     shapes: false,
@@ -200,8 +217,10 @@ async function decodeFrame(blob: Blob, t: number): Promise<HTMLCanvasElement> {
 
 export async function runFontChecks(): Promise<FontCheckResult[]> {
   const out: FontCheckResult[] = [];
+  // How the app loads uploads, but from a fixture file instead of /api/fonts.
+  setCustomFontLoader((ref) => registerFontFace(ref.id, UPLOAD_URL, ref.italic));
   for (const fc of CASES) {
-    const font = FONTS[fc.fontIndex];
+    const font: FontDef = fc.fontIndex === -1 ? customFontDef(UPLOAD) : FONTS[fc.fontIndex];
     const project = projectFor(fc);
     const script = fc.locale ? SCRIPT_FAMILIES[fc.locale === 'ja' ? 'jp' : 'arabic']! : null;
     const dir = fc.locale === 'ar' ? 'rtl' : 'ltr';
@@ -239,7 +258,7 @@ export async function runFontChecks(): Promise<FontCheckResult[]> {
     const loaded = faceLoaded(script ?? font.name, font.h);
     const reasons = [!loaded && 'face not loaded', !p.ok && 'preview glyphs match a fallback, not the real font', !e.ok && 'export glyphs match a fallback, not the real font'].filter(Boolean);
     out.push({
-      font: script ? `${script} (${fc.locale}, after ${font.name})` : font.name,
+      font: script ? `${script} (${fc.locale}, after ${font.name})` : fc.fontIndex === -1 ? `Uploaded font (${UPLOAD.family})` : font.name,
       weight: font.h,
       faceLoaded: loaded,
       preview: p.scores,

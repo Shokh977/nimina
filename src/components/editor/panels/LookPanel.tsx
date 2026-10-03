@@ -1,5 +1,6 @@
 'use client';
 
+import CustomFonts from './CustomFonts';
 import Link from 'next/link';
 
 import { BG_PATTERNS, FCOLORS, FONTS, HL_STYLES, MODELS, PRESETS } from '@/engine/constants';
@@ -41,6 +42,7 @@ export default function LookPanel() {
   const setGrain = useEditorStore((s) => s.setGrain);
   const setVignette = useEditorStore((s) => s.setVignette);
   const font = useEditorStore((s) => s.project.font);
+  const customFont = useEditorStore((s) => s.project.customFont);
   const setFont = useEditorStore((s) => s.setFont);
 
   const accentSwatches = ACCENT_PRESET_INDEXES.map((i) => ({ id: PRESETS[i].accent, background: PRESETS[i].accent, label: PRESETS[i].name }));
@@ -125,7 +127,7 @@ export default function LookPanel() {
           {FONTS.map((f, i) => (
             <SelectableRow
               key={f.name}
-              selected={font === i}
+              selected={!customFont && font === i}
               onClick={() => setFont(i)}
               title={
                 <span style={{ fontFamily: `'${f.name}', Figtree, sans-serif`, fontWeight: f.h }} className="text-[14.5px]">
@@ -136,6 +138,7 @@ export default function LookPanel() {
             />
           ))}
         </div>
+        <CustomFonts selectedId={customFont} />
       </div>
 
       <div>

@@ -4,7 +4,7 @@
  * layout/geom/neighborImg/drawIcon/drawScene/drawTextSlide/drawIntro/
  * drawOutro, and the newScene/newTextSlide factories.
  */
-import { FONTS, MODELS, SLIDE_DEFAULTS } from './constants';
+import { MODELS, SLIDE_DEFAULTS } from './constants';
 import { drawCutoutHollows, drawCutouts } from './cutouts';
 import { calloutGeometry, drawBadge, drawCallout, drawCounter, drawDevice, drawDevice3D, drawGesture, focusLocal, formatCounterValue } from './devices';
 import { drawEffect, STICKER_SPOTS } from './effects';
@@ -185,7 +185,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
   const L = layout(W, H, project.format, style.textPos),
     dur = scene.dur,
     c = style.colors,
-    font = FONTS[project.font];
+    font = style.font;
   const ei = easeOutCubic(clamp(local / 0.8));
   const eo = easeInCubic(clamp((local - (dur - 0.45)) / 0.45));
   const fl = Math.sin(local * 1.7) * H * 0.006;
@@ -536,7 +536,7 @@ export function pushTextLayers(ctx: CanvasRenderingContext2D, items: DrawItem[],
 }
 
 export function drawTextSlide(ctx: CanvasRenderingContext2D, project: Project, scene: TextSlide, style: ResolvedStyle, local: number, W: number, H: number): void {
-  const font = FONTS[project.font],
+  const font = style.font,
     c = style.colors,
     dur = scene.dur,
     els = scene.elements ?? {};
@@ -569,7 +569,7 @@ export function drawTextSlide(ctx: CanvasRenderingContext2D, project: Project, s
 
 export function drawIntro(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, style: ResolvedStyle, local: number, dur: number, W: number, H: number): void {
   const c = style.colors,
-    font = FONTS[project.font],
+    font = style.font,
     els = project.intro.elements ?? {};
   const eo = easeInCubic(clamp((local - (dur - 0.4)) / 0.4)),
     a = 1 - eo;
@@ -617,7 +617,7 @@ export function drawIntro(ctx: CanvasRenderingContext2D, project: Project, asset
 
 export function drawOutro(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, style: ResolvedStyle, local: number, dur: number, W: number, H: number): void {
   const c = style.colors,
-    font = FONTS[project.font],
+    font = style.font,
     o = project.outro,
     els = o.elements ?? {};
   const m = Math.min(W, H),

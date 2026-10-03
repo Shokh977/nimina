@@ -40,6 +40,7 @@ import type {
   Sprite,
   StorySlide,
   TextSlide,
+  CustomFontRef,
 } from '@/engine/types';
 import { newAssetId } from '@/lib/assetSrc';
 import { PLAN_LIMITS, type Plan } from '@/lib/plan';
@@ -88,6 +89,10 @@ interface EditorState {
   setQuality: (quality: Project['quality']) => void;
   setAppName: (name: string) => void;
   setFont: (index: number) => void;
+  /** Uses an uploaded font as the project's typeface (registering it on the project). */
+  setCustomFont: (ref: CustomFontRef) => void;
+  /** Makes an uploaded font available to slide style overrides without changing the default. */
+  registerCustomFont: (ref: CustomFontRef) => void;
   setPreset: (index: number) => void;
   setColors: (colors: Partial<Colors>) => void;
   setModel: (model: Project['model']) => void;
@@ -227,6 +232,12 @@ function defaultSelection(project: Project): number | 'intro' | 'outro' | null {
   if (project.intro.on) return 'intro';
   if (project.outro.on) return 'outro';
   return null;
+}
+
+/** Adds/updates an uploaded font in the project's font registry (customFonts.ts). */
+function withCustomFont(p: Project, ref: CustomFontRef): Project {
+  const list = (p.customFonts ?? []).filter((f) => f.id !== ref.id);
+  return { ...p, customFonts: [...list, { id: ref.id, family: ref.family, weight: ref.weight, ...(ref.italic ? { italic: true } : {}) }] };
 }
 
 function mapSlide(project: Project, id: number, fn: (s: Slide) => Slide): Project {
@@ -405,7 +416,9 @@ export const useEditorStore = create<EditorState>((set, get) => {
     setFormat: (format) => update((p) => ({ ...p, format })),
     setQuality: (quality) => update((p) => ({ ...p, quality })),
     setAppName: (appName) => update((p) => ({ ...p, appName })),
-    setFont: (font) => update((p) => ({ ...p, font })),
+    setFont: (font) => update((p) => ({ ...p, font, customFont: undefined })),
+    setCustomFont: (ref) => update((p) => ({ ...withCustomFont(p, ref), customFont: ref.id })),
+    registerCustomFont: (ref) => update((p) => withCustomFont(p, ref)),
     setPreset: (index) => {
       const preset = PRESETS[index];
       update((p) => ({ ...p, preset: index, colors: preset ? { ...preset } : p.colors }));

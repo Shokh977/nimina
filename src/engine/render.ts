@@ -1,10 +1,11 @@
+import { fontForChoice, projectFont } from './customFonts';
 /**
  * Top-level render entry point. Ported from legacy/promo-studio.html's
  * segments()/styleOf()/bgDiffers()/render(), with the prototype's global
  * `state`/`cur` replaced by explicit `project`/`style` parameters.
  */
 import { drawBg } from './background';
-import { FONTS, FORMATS, PRESETS } from './constants';
+import { FORMATS, PRESETS } from './constants';
 import { applyCamera } from './effects';
 import { drawOverlays, drawWatermark } from './overlays';
 import { drawIntro, drawOutro, drawScene, drawTextSlide } from './slides';
@@ -63,6 +64,7 @@ export function resolveStyle(project: Project, owner: { style?: SlideStyle } | I
     textPos: has('textPos') ? o.textPos! : project.textPos,
     model: has('model') ? o.model! : project.model,
     fcolor: has('fcolor') ? o.fcolor! : project.fcolor,
+    font: fontForChoice(project, has('font') ? o.font : undefined),
   };
 }
 
@@ -113,7 +115,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, project: Project, assets: As
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
-  const font = FONTS[project.font];
+  const font = projectFont(project);
   const { list } = getTimeline(project);
 
   if (!list.length) {

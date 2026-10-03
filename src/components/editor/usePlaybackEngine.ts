@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getSfxEvents, playSfx, scheduleDucking, type SfxEvent } from '@/engine/audio';
 import { FORMATS } from '@/engine/constants';
 import { withElementCollector, type ElementReport } from '@/engine/elements';
+import { customFontsInUse } from '@/engine/customFonts';
 import { ensureProjectFonts } from '@/engine/fonts';
+import '@/components/customFontLoader';
 import { localizeProject } from '@/engine/localization';
 import { getTimeline, render } from '@/engine/render';
 import '@/components/scriptFontLoader';
@@ -77,7 +79,15 @@ export function usePlaybackEngine(): PlaybackEngine {
 
   // Non-Latin languages: fetch the script font for the text on screen (the
   // loop redraws every frame, so it appears as soon as it arrives).
-  const fontText = project.renderLocale ? JSON.stringify([project.renderLocale.locale, project.font, project.appName, project.scenes.map((s) => (s.kind === 'story' ? '' : s.headline + s.sub + s.badge + s.callout))]) : '';
+  // Uploaded typefaces must be fetched before they can draw; script fonts
+  // only matter for a localized preview.
+  const customIds = customFontsInUse(project)
+    .map((f) => f.id)
+    .join(',');
+  const fontText =
+    project.renderLocale || customIds
+      ? JSON.stringify([project.renderLocale?.locale, project.font, customIds, project.appName, project.scenes.map((s) => (s.kind === 'story' ? '' : s.headline + s.sub + s.badge + s.callout))])
+      : '';
   useEffect(() => {
     if (fontText) void ensureProjectFonts(projectRef.current);
   }, [fontText]);

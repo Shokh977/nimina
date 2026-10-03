@@ -5,10 +5,10 @@
  * it — so without this the opening frames of an export can be measured
  * and drawn before the real font arrives.
  */
-import { FONTS } from './constants';
+import { customFontsInUse, fontForChoice, projectFont } from './customFonts';
 import { collectStrings } from './localization';
 import { localeDef, SCRIPT_FAMILIES, type ScriptKey } from './locales';
-import type { Project } from './types';
+import type { CustomFontRef, FontDef, Project } from './types';
 
 /** document.fonts.load never rejects for a missing face, but it can wait
  * on a stalled network request — cap it so a slow font fetch delays an
@@ -34,16 +34,47 @@ export async function ensureScriptFont(script: ScriptKey, text: string, weights:
   await Promise.all(weights.map((w) => document.fonts.load(`${w} 40px "${family}"`, text || ' ').catch(() => [])));
 }
 
+/** Makes an uploaded font's face available under customFontFamily(id).
+ * The engine can't fetch it (it doesn't know where files live), so the app
+ * provides this (src/components/customFontLoader.ts). */
+type CustomFontLoader = (ref: CustomFontRef) => Promise<void>;
+let customFontLoader: CustomFontLoader | null = null;
+export function setCustomFontLoader(loader: CustomFontLoader): void {
+  customFontLoader = loader;
+}
+
+/** Every typeface a project draws with: its default plus any slide/intro/
+ * outro override (built-in or uploaded). */
+export function fontsInUse(project: Project): FontDef[] {
+  const defs = [projectFont(project)];
+  for (const o of [project.intro, project.outro, ...project.scenes]) {
+    const choice = (o as { style?: { font?: string } }).style?.font;
+    if (choice) defs.push(fontForChoice(project, choice));
+  }
+  return [...new Map(defs.map((d) => [d.name, d])).values()];
+}
+
 export async function ensureProjectFonts(project: Project): Promise<void> {
   if (typeof document === 'undefined' || !document.fonts) return;
-  const font = FONTS[project.font];
-  const button = font.h === 400 ? 400 : 700; // drawOutro's CTA button weight
-  const specs = [`${font.h} 40px "${font.name}"`, `${font.s} 40px "${font.name}"`, `${button} 40px "${font.name}"`, '600 40px Figtree', '400 40px Figtree'];
+  const custom = customFontsInUse(project);
+  const fonts = fontsInUse(project);
+  const weights = new Set<number>();
+  const specs = ['600 40px Figtree', '400 40px Figtree'];
+  for (const font of fonts) {
+    const button = font.h === 400 ? 400 : 700; // drawOutro's CTA button weight
+    for (const w of [font.h, font.s, button]) {
+      weights.add(w);
+      specs.push(`${w} 40px "${font.name}"`);
+    }
+  }
   const script = project.renderLocale ? localeDef(project.renderLocale.locale).script : 'latin';
   const loads = Promise.all([
-    ...specs.map((f) => document.fonts.load(f).catch(() => [])),
+    // Uploaded faces first (they must be registered before document.fonts.load can find them).
+    Promise.all(custom.map((ref) => (customFontLoader ? customFontLoader(ref).catch((err) => console.warn('[fonts] uploaded font failed to load', ref.family, err)) : Promise.resolve()))).then(() =>
+      Promise.all(specs.map((f) => document.fonts.load(f).catch(() => []))),
+    ),
     // A localized copy: the script font, for exactly the text it renders.
-    ensureScriptFont(script, collectStrings(project).map((s) => s.source).join(' '), [...new Set([font.h, font.s, button])]),
+    ensureScriptFont(script, collectStrings(project).map((s) => s.source).join(' '), [...weights]),
   ]).then(() => document.fonts.ready);
   await Promise.race([loads, new Promise((r) => setTimeout(r, LOAD_TIMEOUT_MS))]);
 }

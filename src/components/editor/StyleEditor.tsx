@@ -1,5 +1,6 @@
 'use client';
 
+import { useUserFonts } from './useUserFonts';
 import { useEditorStore } from '@/store/editorStore';
 import type { SlideStyle } from '@/engine/types';
 import { defaultLabel, overrideCount, STYLE_FIELDS, type StyleFieldKey } from './styleFields';
@@ -26,7 +27,14 @@ export default function StyleEditor({
  defaultOpen?: boolean;
 }) {
  const project = useEditorStore((s) => s.project);
+ const registerCustomFont = useEditorStore((s) => s.registerCustomFont);
+ const { fonts: userFonts } = useUserFonts();
  const n = overrideCount(style);
+ // Typeface choices: built-ins, the account's uploaded fonts, and any font
+ // the project already uses (even if it has since left the account).
+ const fontOptions = keys.includes('font')
+   ? [...STYLE_FIELDS.font.options(project).filter(([v]) => !v.startsWith('u:') || !userFonts.some((f) => `u:${f.id}` === v)), ...userFonts.map((f): [string, string] => [`u:${f.id}`, `${f.family} (uploaded)`])]
+   : [];
 
  return (
  <Details
@@ -47,11 +55,17 @@ export default function StyleEditor({
  {field.label}
  <select
  value={current}
- onChange={(e) => onChange(key, e.target.value || undefined)}
+ onChange={(e) => {
+ const v = e.target.value || undefined;
+ // An account font not used in this project yet: register it first.
+ const uf = v?.startsWith('u:') ? userFonts.find((f) => f.id === v.slice(2)) : undefined;
+ if (uf) registerCustomFont({ id: uf.id, family: uf.family, weight: uf.weight, italic: uf.italic });
+ onChange(key, v);
+ }}
  className="mt-1 block w-full min-w-0 max-w-full rounded-lg border border-white/[.12] bg-white/[.03] px-2.5 py-2 text-[14.5px] text-[#f4f5f8] "
  >
  <option value="">Default ({defaultLabel(project, key)})</option>
- {field.options().map(([v, label]) => (
+ {(key === 'font' ? fontOptions : field.options(project)).map(([v, label]) => (
  <option key={v} value={v}>
  {label}
  </option>

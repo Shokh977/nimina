@@ -8,7 +8,7 @@
  * module-level state — so any frame can be rendered independently
  * (required for frame-by-frame export).
  */
-import { FONTS, MODELS } from '../constants';
+import { MODELS } from '../constants';
 import { drawDevice, screenBox } from '../devices';
 import type { Action, AssetMap, ImageAsset, Project, ResolvedStyle, ScreenBox, StorySlide } from '../types';
 import { clamp, easeInOutCubic, easeOutCubic, rr } from '../utils';
@@ -123,7 +123,7 @@ function activeEntries(entries: StoryTimelineEntry[], local: number): StoryTimel
 
 export function renderStory(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, slide: StorySlide, style: ResolvedStyle, local: number, W: number, H: number): void {
   const timeline = getStoryTimeline(slide, project.motionSpeed / 100);
-  const font = FONTS[project.font];
+  const font = style.font;
   const state = resolveScreenState(timeline.entries, local);
   const camera = resolveCamera(slide, timeline, local);
 

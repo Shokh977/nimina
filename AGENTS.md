@@ -702,6 +702,27 @@ touch. Overlapping elements: the smallest under the pointer wins; stickers
 `src/store/elementOps.ts`, so they're undoable and autosaved. Story slides
 have their own editor and no canvas elements.
 
+## Custom fonts (Pro)
+
+Upload .woff2/.ttf/.otf (≤ 2 MB, ≤ 10 per account) in Look → Typeface →
+Your fonts. `/api/fonts` (POST) checks Pro, the limits and the required
+"I have the right to use this font commercially" statement (its time is
+stored in `user_fonts.rights_confirmed_at`, migration 0021), then parses the
+file fully with fontkit (`src/lib/fonts/parse.ts`: format from the header
+bytes, family/weight from the file, character coverage) and rejects
+anything that doesn't parse. Files live in R2 at `{user_id}/fonts/` and
+count toward storage.
+
+Projects reference uploads by id (`project.customFont`, `style.font =
+'u:<id>'`, registry in `project.customFonts`); the engine draws them under
+an internal family name (`customFonts.ts`) so a same-named installed font
+can't stand in, and `ensureProjectFonts` loads them through the loader the
+app registers (`src/components/customFontLoader.ts`, signed URLs). Missing
+glyphs fall back per character to the language's Noto font (Figtree for
+Latin scripts); the Languages tab lists which characters a font lacks. The
+standing font check covers an uploaded font (fixture
+`public/dev-fixtures/upload-test.woff2`, Noto Sans, OFL).
+
 ## Operations
 
 Backups (weekly pg_dump to R2, proven by an automatic restore), the
