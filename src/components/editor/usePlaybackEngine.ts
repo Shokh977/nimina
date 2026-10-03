@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getSfxEvents, playSfx, scheduleDucking, type SfxEvent } from '@/engine/audio';
 import { FORMATS } from '@/engine/constants';
+import { withElementCollector, type ElementReport } from '@/engine/elements';
 import { ensureProjectFonts } from '@/engine/fonts';
 import { localizeProject } from '@/engine/localization';
 import { getTimeline, render } from '@/engine/render';
@@ -30,6 +31,16 @@ export interface PlaybackEngine {
    * Doesn't touch plan/export, purely a live-preview toggle. */
   previewNoWatermark: boolean;
   togglePreviewWatermark: () => void;
+  /** The elements drawn in the current frame, with the segment they belong
+   * to — what the canvas editor (CanvasEditor.tsx) selects and moves. */
+  elements: FrameElements;
+  /** Elements to leave out of the drawing (text being edited inline). */
+  setHiddenElements: (keys: string[]) => void;
+}
+
+export interface FrameElements {
+  owner: 'intro' | 'outro' | number | null;
+  list: ElementReport[];
 }
 
 /**
@@ -81,6 +92,12 @@ export function usePlaybackEngine(): PlaybackEngine {
   const [playing, setPlaying] = useState(false);
   const [displayT, setDisplayT] = useState(0);
   const [previewNoWatermark, setPreviewNoWatermark] = useState(false);
+  const [elements, setElements] = useState<FrameElements>({ owner: null, list: [] });
+  const elementsSigRef = useRef('');
+  const hiddenRef = useRef<ReadonlySet<string> | null>(null);
+  const setHiddenElements = useCallback((keys: string[]) => {
+    hiddenRef.current = keys.length ? new Set(keys) : null;
+  }, []);
   const previewNoWatermarkRef = useRef(false);
   const togglePreviewWatermark = useCallback(() => {
     setPreviewNoWatermark((v) => {
@@ -208,6 +225,7 @@ export function usePlaybackEngine(): PlaybackEngine {
 
   useEffect(() => {
     const loop = (now: number) => {
+      const reported: ElementReport[] = [];
       const canvas = canvasRef.current;
       const proj = projectRef.current;
       if (canvas) {
@@ -234,7 +252,25 @@ export function usePlaybackEngine(): PlaybackEngine {
           setDisplayT(next);
         }
         const ctx = canvas.getContext('2d');
-        if (ctx) render(ctx, proj, assetsRef.current.images, tRef.current, scaleRef.current, { watermark: planRef.current === 'free' && !previewNoWatermarkRef.current });
+        if (ctx) {
+          withElementCollector(
+            (r) => reported.push(r),
+            hiddenRef.current,
+            () => render(ctx, proj, assetsRef.current.images, tRef.current, scaleRef.current, { watermark: planRef.current === 'free' && !previewNoWatermarkRef.current }),
+          );
+          // Publish only when something changed (the list is stable while
+          // nothing is edited — boxes are rest positions, not animated).
+          const { list } = getTimeline(proj);
+          let idx = list.findIndex((g) => tRef.current >= g.start && tRef.current < g.start + g.dur);
+          if (idx < 0) idx = list.length - 1;
+          const seg = list[idx];
+          const owner = !seg ? null : seg.type === 'intro' ? 'intro' : seg.type === 'outro' ? 'outro' : (seg.scene?.id ?? null);
+          const sig = JSON.stringify([owner, reported]);
+          if (sig !== elementsSigRef.current) {
+            elementsSigRef.current = sig;
+            setElements({ owner, list: reported });
+          }
+        }
       }
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -276,5 +312,5 @@ export function usePlaybackEngine(): PlaybackEngine {
     });
   }, [startAudioFrom, stopAudio]);
 
-  return { canvasRef, playing, displayT, total, togglePlay, seek, playFrom, setDisplaySize, previewNoWatermark, togglePreviewWatermark };
+  return { canvasRef, playing, displayT, total, togglePlay, seek, playFrom, setDisplaySize, previewNoWatermark, togglePreviewWatermark, elements, setHiddenElements };
 }

@@ -5,6 +5,16 @@
 import type { Camera, ClassicSlide, EffectBox, ResolvedStyle } from './types';
 import { clamp, easeInOutCubic, easeOutBack, graphemes, seeded } from './utils';
 
+/** Where stickers sit, as fractions of the device box (shared with the
+ * element box the editor selects — slides.ts stickersBox). */
+export const STICKER_SPOTS: ReadonlyArray<readonly [number, number]> = [
+  [-0.62, -0.28],
+  [0.62, -0.08],
+  [-0.58, 0.26],
+  [0.6, 0.34],
+  [0.05, -0.6],
+];
+
 export function drawEffect(ctx: CanvasRenderingContext2D, scene: ClassicSlide, local: number, W: number, H: number, box: EffectBox, style: ResolvedStyle): void {
   const fx = scene.effect;
   if (!fx || fx === 'none') return;
@@ -65,13 +75,7 @@ export function drawEffect(ctx: CanvasRenderingContext2D, scene: ClassicSlide, l
     const list = graphemes(scene.stickers || '')
       .filter((g) => g.trim())
       .slice(0, 5);
-    const spots: Array<[number, number]> = [
-      [-0.62, -0.28],
-      [0.62, -0.08],
-      [-0.58, 0.26],
-      [0.6, 0.34],
-      [0.05, -0.6],
-    ];
+    const spots = STICKER_SPOTS;
     list.forEach((g, i) => {
       const p = easeOutBack(clamp((local - 0.6 - i * 0.15) / 0.5));
       if (p <= 0) return;

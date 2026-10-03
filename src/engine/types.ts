@@ -1,3 +1,4 @@
+import type { ElementMap, TextLayer } from './elements';
 /**
  * Data model for the Nimina rendering engine.
  *
@@ -219,6 +220,10 @@ export interface Pose3D {
 
 interface SlideBase {
   id: number;
+  /** Direct-manipulation overrides per element (elements.ts). Absent = default layout. */
+  elements?: ElementMap;
+  /** Extra text boxes the user added (elements.ts TextLayer). */
+  texts?: TextLayer[];
   headline: string;
   sub: string;
   anim: SlideAnim;
@@ -412,6 +417,9 @@ export type ClassicSlide = ImageSlide | TextSlide;
 
 export interface IntroConfig {
   on: boolean;
+  /** Direct-manipulation overrides per element (elements.ts). */
+  elements?: ElementMap;
+  texts?: TextLayer[];
   dur: number;
   tagline: string;
   style: SlideStyle;
@@ -419,6 +427,9 @@ export interface IntroConfig {
 
 export interface OutroConfig {
   on: boolean;
+  /** Direct-manipulation overrides per element (elements.ts). */
+  elements?: ElementMap;
+  texts?: TextLayer[];
   dur: number;
   cta: string;
   button: string;

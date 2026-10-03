@@ -659,6 +659,21 @@ export function drawCounter(ctx: CanvasRenderingContext2D, cfg: CounterConfig, l
   ctx.textBaseline = 'alphabetic';
 }
 
+/** Where drawCallout puts its bubble for a target point (tx, ty) — shared
+ * with the element box the editor selects (elements.ts). Leaves ctx.font
+ * set to the bubble font. */
+export function calloutGeometry(ctx: CanvasRenderingContext2D, text: string, tx: number, ty: number, W: number, H: number, font: FontDef) {
+  const size = Math.min(W, H) * 0.036;
+  ctx.font = fontStr(font.h === 400 ? 400 : 700, size, font.name);
+  const bw = ctx.measureText(text).width + size * 1.5,
+    bh = size * 2.1;
+  const side = tx < W / 2 ? -1 : 1;
+  let bx = tx + side * Math.min(W, H) * 0.26 - bw / 2;
+  bx = clamp(bx, W * 0.03, W * 0.97 - bw);
+  const by = clamp(ty - Math.min(W, H) * 0.16, H * 0.03, H * 0.97 - bh);
+  return { size, bw, bh, bx, by, side };
+}
+
 export function drawCallout(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -673,15 +688,8 @@ export function drawCallout(
 ): void {
   const e = clamp((local - 1.0) / 0.6);
   if (e <= 0 || alpha <= 0) return;
-  const c = style.colors,
-    size = Math.min(W, H) * 0.036;
-  ctx.font = fontStr(font.h === 400 ? 400 : 700, size, font.name);
-  const bw = ctx.measureText(text).width + size * 1.5,
-    bh = size * 2.1;
-  const side = tx < W / 2 ? -1 : 1;
-  let bx = tx + side * Math.min(W, H) * 0.26 - bw / 2;
-  bx = clamp(bx, W * 0.03, W * 0.97 - bw);
-  const by = clamp(ty - Math.min(W, H) * 0.16, H * 0.03, H * 0.97 - bh);
+  const c = style.colors;
+  const { size, bw, bh, bx, by, side } = calloutGeometry(ctx, text, tx, ty, W, H, font);
   const sx = side < 0 ? bx + bw * 0.7 : bx + bw * 0.3,
     sy = by + bh;
   const cx = (sx + tx) / 2 + side * Math.min(W, H) * 0.06,

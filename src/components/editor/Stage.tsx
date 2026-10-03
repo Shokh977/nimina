@@ -1,15 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { FORMATS } from '@/engine/constants';
-import { renderLocaleFor } from '@/engine/localization';
-import { withTextLocale } from '@/engine/locales';
-import { getTimeline, resolveStyle } from '@/engine/render';
-import { layout } from '@/engine/slides';
-import type { ClassicSlide, Format } from '@/engine/types';
+import type { Format } from '@/engine/types';
 import { useEditorStore } from '@/store/editorStore';
+import CanvasEditor from './CanvasEditor';
 import type { PlaybackEngine } from './usePlaybackEngine';
 
 // Multilingual projects only (loaded on demand, like the Languages tab).
@@ -40,53 +37,18 @@ function computeFitSize(format: Format, availableWidth: number, availableHeight:
   return { width: Math.round(width), height: Math.round(height) };
 }
 
-function stripStars(s: string): string {
-  return s.replace(/\*/g, '');
-}
-
-/** Renders `*word*` runs in the accent color, same convention the canvas's
- * own drawWords() uses — a best-effort visual match for the click-to-edit
- * overlay's read mode (not the canvas itself, which the render engine
- * still draws pixel-for-pixel). */
-function HighlightedText({ text, accent }: { text: string; accent: string }) {
-  const parts = text.split(/(\*[^*]+\*)/g);
-  return (
-    <>
-      {parts.map((part, i) =>
-        part.startsWith('*') && part.endsWith('*') ? (
-          <span key={i} style={{ color: accent }}>
-            {part.slice(1, -1)}
-          </span>
-        ) : (
-          <span key={i}>{part}</span>
-        ),
-      )}
-    </>
-  );
-}
-
-/** The canvas, ResizeObserver-measured to fit the stage box exactly, plus
- * a click-to-edit overlay for the headline/supporting line of whichever
- * slide is currently on screen (the segment under the playhead — selecting
- * a slide in the rail/filmstrip seeks the playhead there, so the two stay
- * in sync). Transport controls live in TransportBar, a sibling under this. */
+/** The canvas, ResizeObserver-measured to fit the stage box exactly, with
+ * the direct-manipulation layer (CanvasEditor) on top: its boxes come from
+ * what the engine drew, so nothing is re-rendered in HTML over the canvas
+ * (the old click-to-edit overlay drew the headline a second time — see
+ * CanvasEditor.tsx). Transport controls live in TransportBar, below this. */
 export default function Stage({ engine, touch = false }: { engine: PlaybackEngine; touch?: boolean }) {
   const project = useEditorStore((s) => s.project);
-  const updateSlide = useEditorStore((s) => s.updateSlide);
-  const previewLocale = useEditorStore((s) => s.previewLocale);
-  const { canvasRef, displayT, setDisplaySize, playing } = engine;
+  const { canvasRef, setDisplaySize } = engine;
 
   const boxRef = useRef<HTMLDivElement>(null);
-  const headlineRef = useRef<HTMLButtonElement>(null);
   const [fitSize, setFitSize] = useState({ width: 260, height: 466 });
   const [zoomIndex, setZoomIndex] = useState(FIT_ZOOM_INDEX);
-  const [editing, setEditing] = useState<'headline' | 'sub' | null>(null);
-  const [draft, setDraft] = useState('');
-  // Measured, not assumed — the headline can wrap to 2+ lines depending on
-  // its own text, so the supporting-line overlay's position is derived
-  // from the headline overlay's actual rendered height (a fixed
-  // single-line offset would overlap a wrapped headline).
-  const [headlineHeight, setHeadlineHeight] = useState(0);
 
   const zoomPercent = ZOOM_STEPS[zoomIndex];
   // Touch mode: continuous pinch zoom plus a pan offset, instead of the
@@ -133,33 +95,7 @@ export default function Stage({ engine, touch = false }: { engine: PlaybackEngin
     window.localStorage.setItem(ZOOM_KEY, String(ZOOM_STEPS[clamped]));
   };
 
-  const { list: segments } = getTimeline(project);
-  let idx = segments.findIndex((g) => displayT >= g.start && displayT < g.start + g.dur);
-  if (idx < 0) idx = segments.length - 1;
-  const seg = segments[idx];
-  const style = seg ? resolveStyle(project, seg.owner) : null;
-  const slide: ClassicSlide | null = seg?.type === 'scene' && seg.scene && seg.scene.kind !== 'story' ? seg.scene : null;
-  // The overlay edits the project's own (source-language) text in place,
-  // so it's laid out in the source language — and hidden entirely while a
-  // translation is previewed (the translation table edits those).
-  const loc = project.localization;
-  const sourceLocale = loc ? renderLocaleFor(loc, loc.source) : undefined;
-  const previewingTranslation = !!loc && !!previewLocale && previewLocale !== loc.source;
-  const L = withTextLocale(sourceLocale, () => layout(FORMATS[project.format].w, FORMATS[project.format].h, project.format, style?.textPos ?? 'top'));
   const cssScale = size.width / FORMATS[project.format].w;
-  const textLeft = (L.align === 'center' ? L.textX - L.textW / 2 : L.align === 'right' ? L.textX - L.textW : L.textX) * cssScale;
-  const textDir = sourceLocale?.dir ?? 'ltr';
-  const headlineTop = (L.textY ?? FORMATS[project.format].h * 0.075) * cssScale;
-  const minHeadlineGap = L.hSize * cssScale * 1.35;
-  const subTop = headlineTop + Math.max(minHeadlineGap, headlineHeight + 6);
-
-  useLayoutEffect(() => {
-    // While actively editing the headline, the read-mode button (and its
-    // ref) is unmounted — keep the last measured height instead of
-    // collapsing to the single-line minimum, so the supporting-line
-    // overlay doesn't jump up and overlap the 2-row textarea mid-edit.
-    if (headlineRef.current) setHeadlineHeight(headlineRef.current.offsetHeight);
-  }, [slide?.headline, editing, size.width, L.textW, L.hSize]);
 
   // ---- touch: two fingers pinch to zoom and drag to pan; one finger taps
   // (the tap-to-edit text below keeps working).
@@ -181,7 +117,6 @@ export default function Stage({ engine, touch = false }: { engine: PlaybackEngin
       const { mid, dist } = twoFingers();
       gesture.current = { z0: touchZoom, pan0: pan, mid0: mid, dist0: dist, live: { z: touchZoom, pan } };
       suppressClick.current = true;
-      if (editing) commitEdit();
     }
   };
   const onTouchPointerMove = (e: React.PointerEvent) => {
@@ -220,16 +155,6 @@ export default function Stage({ engine, touch = false }: { engine: PlaybackEngin
     setPan({ x: 0, y: 0 });
   };
 
-  const startEdit = (field: 'headline' | 'sub') => {
-    if (!slide || playing) return;
-    setDraft(field === 'headline' ? slide.headline : slide.sub);
-    setEditing(field);
-  };
-  const commitEdit = () => {
-    if (slide && editing) updateSlide(slide.id, { [editing]: draft });
-    setEditing(null);
-  };
-
   return (
     <div className="relative flex flex-1 flex-col min-h-0">
       <div
@@ -251,63 +176,14 @@ export default function Stage({ engine, touch = false }: { engine: PlaybackEngin
             : undefined
         }
       >
-        <div
-          ref={frameRef}
-          data-touch-exempt
-          className={`relative flex-none overflow-hidden border border-white/10 shadow-[0_40px_90px_rgba(0,0,0,.6)] ${touch ? 'rounded-[16px]' : 'rounded-[22px]'}`}
-          style={{ width: size.width, height: size.height, transform: touch ? `translate(${pan.x}px, ${pan.y}px)` : undefined }}
-        >
-          <canvas ref={canvasRef} className="block" />
-          {(project.localization?.languages.length ?? 0) > 1 && <LanguageSwitcher />}
-
-        {slide && style && !previewingTranslation && (
-          <>
-            <span className="absolute top-3 left-3 rounded-[7px] bg-[#08090c]/55 px-[9px] py-[5px] text-[11px] font-semibold text-[#f4f5f8] backdrop-blur-sm">{slide.headline ? stripStars(slide.headline).slice(0, 24) || 'Slide' : 'Slide'}</span>
-
-            {editing === 'headline' ? (
-              <textarea
-                autoFocus
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
-                style={{ left: textLeft, top: headlineTop - 6, width: L.textW * cssScale, fontSize: L.hSize * cssScale, textAlign: L.align, direction: textDir }}
-                className="absolute resize-none rounded-[9px] border border-dashed border-white/75 bg-black/[.18] font-[family-name:var(--font-space-grotesk)] leading-[1.15] font-bold text-white outline-none"
-                rows={2}
-              />
-            ) : (
-              <button
-                ref={headlineRef}
-                onClick={() => startEdit('headline')}
-                style={{ left: textLeft, top: headlineTop, width: L.textW * cssScale, fontSize: L.hSize * cssScale, textAlign: L.align, direction: textDir }}
-                className="absolute rounded-[9px] border border-dashed border-transparent font-[family-name:var(--font-space-grotesk)] leading-[1.15] font-bold text-white hover:border-white/40"
-              >
-                <HighlightedText text={stripStars(slide.headline) ? slide.headline : ' '} accent={style.colors.accent} />
-              </button>
-            )}
-
-            {editing === 'sub' ? (
-              <textarea
-                autoFocus
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={(e) => e.key === 'Escape' && setEditing(null)}
-                style={{ left: textLeft, top: subTop - 4, width: L.textW * cssScale, fontSize: L.sSize * cssScale, textAlign: L.align, direction: textDir }}
-                className="absolute resize-none rounded-[9px] border border-dashed border-white/75 bg-black/[.18] leading-[1.45] text-white/90 outline-none"
-                rows={2}
-              />
-            ) : (
-              <button
-                onClick={() => startEdit('sub')}
-                style={{ left: textLeft, top: subTop, width: L.textW * cssScale, fontSize: L.sSize * cssScale, textAlign: L.align, direction: textDir }}
-                className="absolute rounded-[9px] border border-dashed border-transparent leading-[1.45] text-white/90 hover:border-white/40"
-              >
-                {slide.sub || ' '}
-              </button>
-            )}
-          </>
-        )}
+        <div ref={frameRef} className="relative flex-none" style={{ width: size.width, height: size.height, transform: touch ? `translate(${pan.x}px, ${pan.y}px)` : undefined }}>
+          {/* The canvas is clipped to rounded corners; the editing layer is
+              not, so selection handles at the canvas edge stay reachable. */}
+          <div data-touch-exempt className={`absolute inset-0 overflow-hidden border border-white/10 shadow-[0_40px_90px_rgba(0,0,0,.6)] ${touch ? 'rounded-[16px]' : 'rounded-[22px]'}`}>
+            <canvas ref={canvasRef} className="block" />
+            {(project.localization?.languages.length ?? 0) > 1 && <LanguageSwitcher />}
+          </div>
+          <CanvasEditor engine={engine} W={FORMATS[project.format].w} H={FORMATS[project.format].h} cssScale={cssScale} touch={touch} />
         </div>
       </div>
 

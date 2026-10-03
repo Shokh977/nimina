@@ -679,6 +679,29 @@ tap-to-edit text. Panels are shared with desktop; `data-touch-ui` rules in
 iOS focus zoom), and form rows are `grid-cols-1 md:grid-cols-2`. Phones
 export at most 720p (`deviceExportCap`, with a note in the Export panel).
 
+## Canvas editing (direct manipulation)
+
+Every element a segment draws — headline, subtitle, device, badge,
+callout, counter, stickers, intro/outro icon, outro button, user text boxes —
+is drawn through `placeElement` (`src/engine/elements.ts`), which (a)
+applies the owner's optional override `elements[key]` (centre as a fraction
+of the canvas, scale, rotation, text wrap width, stacking order) as a
+transform around the element's default rest box, and (b) reports the
+element's boxes to an optional collector. With no override the drawing is
+untouched: a full-frame hash comparison of 864 frames (all templates and
+fixtures, every format) was byte-identical before/after the refactor.
+Badge, callout and counter follow the device until moved themselves.
+
+`CanvasEditor.tsx` (over the stage canvas, outside its clip) builds the UI
+from those reports — select, move with snapping guides (Ctrl/⌘ = free),
+8 handles (text: corners scale, sides re-wrap), rotate (shift = 15°),
+marquee, align/distribute, keyboard, right-click stacking, double-click
+inline text editing (the element is hidden from the render while edited),
+touch. Overlapping elements: the smallest under the pointer wins; stickers
+(`sparse`) only where nothing solid is. Edits go through store actions in
+`src/store/elementOps.ts`, so they're undoable and autosaved. Story slides
+have their own editor and no canvas elements.
+
 ## Operations
 
 Backups (weekly pg_dump to R2, proven by an automatic restore), the

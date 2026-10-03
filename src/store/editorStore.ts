@@ -13,6 +13,8 @@
  * collapse into one undo step, while undo()/redo() themselves flush any
  * pending commit first.
  */
+import type { ElementKey, ElementXform, TextLayer } from '@/engine/elements';
+import { addTextLayer, deleteElement, setStackOrder, setTextOf, setXforms, type ElementOwner } from './elementOps';
 import { create } from 'zustand';
 
 import { PRESETS } from '@/engine/constants';
@@ -127,6 +129,14 @@ interface EditorState {
   removeSlide: (id: number) => void;
   duplicateSlide: (id: number) => void;
   moveSlide: (id: number, dir: 1 | -1) => void;
+  /** Moves a slide to just before `beforeId` (or to the end when null) — timeline drag-to-reorder. */
+  moveSlideBefore: (id: number, beforeId: number | null) => void;
+  /* ---- direct manipulation on the canvas (src/store/elementOps.ts) ---- */
+  setElementXforms: (owner: ElementOwner, patch: Partial<Record<ElementKey, ElementXform | null>>) => void;
+  setElementText: (owner: ElementOwner, key: ElementKey, text: string) => void;
+  deleteElements: (owner: ElementOwner, keys: ElementKey[]) => void;
+  addTextLayer: (owner: ElementOwner, layer: TextLayer, xf: ElementXform) => void;
+  setElementStackOrder: (owner: ElementOwner, keysBottomToTop: ElementKey[]) => void;
   setSlideStyle: (id: number, key: keyof SlideStyle, value: string | undefined) => void;
   resetSlideStyle: (id: number) => void;
   applyStyleToAll: (id: number) => void;
@@ -490,6 +500,21 @@ export const useEditorStore = create<EditorState>((set, get) => {
         const scenes = [...p.scenes];
         [scenes[i], scenes[j]] = [scenes[j], scenes[i]];
         return { ...p, scenes };
+      }),
+    setElementXforms: (owner, patch) => update((p) => setXforms(p, owner, patch)),
+    setElementText: (owner, key, text) => update((p) => setTextOf(p, owner, key, text)),
+    deleteElements: (owner, keys) => update((p) => keys.reduce((acc, k) => deleteElement(acc, owner, k), p)),
+    addTextLayer: (owner, layer, xf) => update((p) => addTextLayer(p, owner, layer, xf)),
+    setElementStackOrder: (owner, keys) => update((p) => setStackOrder(p, owner, keys)),
+    moveSlideBefore: (id, beforeId) =>
+      update((p) => {
+        const moving = p.scenes.find((s) => s.id === id);
+        if (!moving || id === beforeId) return p;
+        const rest = p.scenes.filter((s) => s.id !== id);
+        const at = beforeId === null ? rest.length : rest.findIndex((s) => s.id === beforeId);
+        if (at < 0) return p;
+        const scenes = [...rest.slice(0, at), moving, ...rest.slice(at)];
+        return scenes.every((s, i) => s === p.scenes[i]) ? p : { ...p, scenes };
       }),
     setSlideStyle: (id, key, value) => update((p) => mapSlide(p, id, (s) => ({ ...s, style: withStyle(s.style, key, value) }))),
     resetSlideStyle: (id) => update((p) => mapSlide(p, id, (s) => ({ ...s, style: {} }))),
