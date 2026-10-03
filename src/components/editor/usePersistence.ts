@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import { getMusicLibraryUrl } from '@/lib/supabase/musicLibrary';
 import { saveProjectData, saveProjectThumbnail } from '@/lib/supabase/projects';
 import { useEditorStore } from '@/store/editorStore';
+import { openRecording } from './video/recordings';
 
 const SAVE_DEBOUNCE_MS = 1500;
 const THUMBNAIL_MIN_INTERVAL_MS = 60_000;
@@ -106,9 +107,10 @@ export function usePersistence(projectId: string, initialProject: Project): Save
       // Audio clips (normalizeProject turns a pre-timeline `music` field into one).
       const audioIds = [...new Set(allAudioClips(normalizeProject(initialProject)).map((c) => c.assetId))];
       const ownAudioIds = audioIds.filter((id) => !id.startsWith('library:'));
+      const videoIds = [...new Set(initialProject.scenes.flatMap((s) => (s.kind === 'video' && s.video.assetId ? [s.video.assetId] : [])))];
       let urls: Record<string, string> = {};
       try {
-        urls = await getSignedAssetUrls(projectId, [...imageIds, ...ownAudioIds]);
+        urls = await getSignedAssetUrls(projectId, [...imageIds, ...ownAudioIds, ...videoIds]);
       } catch (err) {
         console.error('[persistence] failed to sign asset URLs', err);
       }
@@ -122,6 +124,21 @@ export function usePersistence(projectId: string, initialProject: Project): Save
             if (!cancelled) useEditorStore.getState().registerImage(assetId, img);
           } catch (err) {
             console.error('[persistence] failed to load image asset', assetId, err);
+          }
+        }),
+      );
+
+      // Screen recordings of video slides: the whole file (≤ 100 MB) — the
+      // player streams from memory and export decodes frames from it.
+      await Promise.all(
+        videoIds.map(async (assetId) => {
+          try {
+            const url = urls[assetId];
+            if (!url) throw new Error('no URL for the recording');
+            const blob = await (await fetch(url)).blob();
+            if (!cancelled) await openRecording(assetId, blob);
+          } catch (err) {
+            console.error('[persistence] failed to load recording', assetId, err);
           }
         }),
       );

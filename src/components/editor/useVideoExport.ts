@@ -60,7 +60,7 @@ export function useVideoExport() {
       if (controller.signal.aborted) break;
       setResults((prev) => prev.map((r) => (r.format === format ? { ...r, status: 'rendering' } : r)));
       try {
-        const outcome = await exportVideo({ ...project, format }, assets.images, assets.audio, { resolution, watermark: !isPro(plan) }, controller.signal, (done, total) => {
+        const outcome = await exportVideo({ ...project, format }, assets.images, assets.audio, { resolution, watermark: !isPro(plan), videos: assets.videos }, controller.signal, (done, total) => {
           const progress = Math.min(100, (done / total) * 100);
           setResults((prev) => prev.map((r) => (r.format === format ? { ...r, progress } : r)));
         });

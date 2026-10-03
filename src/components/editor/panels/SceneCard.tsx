@@ -20,6 +20,7 @@ import SwatchGrid from '../ui/SwatchGrid';
 import ToggleRow from '../ui/ToggleRow';
 import CutoutsEditor from './CutoutsEditor';
 import StorySceneEditor from './story/StorySceneEditor';
+import VideoClipEditor from './VideoClipEditor';
 
 const GHOST_BTN = 'grid h-9 w-9 place-items-center rounded-[10px] border border-white/[.12] bg-white/[.03] text-[13px] font-semibold text-[#c9cdd8] transition-colors duration-[.16s] hover:bg-white/[.08] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]';
 const DESTRUCTIVE_BTN = 'w-full rounded-[10px] border border-[#ff7a59]/[.28] bg-[#ff7a59]/[.07] px-4 py-2.5 text-[13.5px] font-semibold text-[#ff8f76] transition-colors duration-[.16s] hover:bg-[#ff7a59]/[.16] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]';
@@ -74,7 +75,10 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
   }
 
   const isText = slide.kind === 'text';
+  const isVideo = slide.kind === 'video';
   const image = slide.kind === 'image' ? slide : null;
+  // A video slide shares the image slide's device/motion settings.
+  const deviceSlide = slide.kind === 'image' ? slide : slide.kind === 'video' ? (slide as unknown as ImageSlide) : null;
   const img = image?.imgAssetId ? assets.images[image.imgAssetId] : null;
   const pick = !isText && !!image && (image.anim === 'spotlight' || image.gesture !== 'none' || !!image.callout);
   const start = sceneStart(project, slide.id);
@@ -109,12 +113,14 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
     <div className="grid grid-cols-1 gap-5">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[13.5px] font-semibold text-[#f4f5f8]">
-          {isText ? 'Text slide' : 'Slide'} {index + 1}
+          {isText ? 'Text slide' : isVideo ? 'Recording' : 'Slide'} {index + 1}
         </span>
         {moveRow}
       </div>
 
-      {!isText && (
+      {slide.kind === 'video' && <VideoClipEditor slide={slide} />}
+
+      {!isText && !isVideo && (
         <div onClick={onThumbClick} className={`relative inline-block w-full overflow-hidden rounded-xl bg-black/40 leading-none ${pick ? 'cursor-crosshair' : 'cursor-pointer'}`}>
           {img ? (
             // eslint-disable-next-line @next/next/no-img-element -- in-memory/data-URL asset, not a static/remote file Next's Image optimizer can handle
@@ -154,18 +160,22 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
         />
       </label>
 
-      <div>
-        <SectionLabel>Length</SectionLabel>
-        <SegmentedControl scroll options={DUR_OPTIONS} value={String(slide.dur)} onChange={(v) => setF('dur', Number(v))} />
-      </div>
+      {!isVideo && (
+        <div>
+          <SectionLabel>Length</SectionLabel>
+          <SegmentedControl scroll options={DUR_OPTIONS} value={String(slide.dur)} onChange={(v) => setF('dur', Number(v))} />
+        </div>
+      )}
 
       {!isText && (
         <div>
           <SectionLabel
             trailing={
-              <button onClick={() => replaceInputRef.current?.click()} className="text-[12px] font-semibold text-[#8b7dff] hover:text-[#a89bff]">
-                Replace screenshot
-              </button>
+              isVideo ? undefined : (
+                <button onClick={() => replaceInputRef.current?.click()} className="text-[12px] font-semibold text-[#8b7dff] hover:text-[#a89bff]">
+                  Replace screenshot
+                </button>
+              )
             }
           >
             Background
@@ -186,12 +196,12 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
       )}
 
       <Details summary="Motion and effects">
-        {isText ? <TextEffectsFields slide={slide} setF={setF} lockedEffects={lockedEffects} /> : image && <ImageEffectsFields slide={image} pick={pick} setF={setF} lockedEffects={lockedEffects} />}
+        {isText ? <TextEffectsFields slide={slide} setF={setF} lockedEffects={lockedEffects} /> : deviceSlide && <ImageEffectsFields slide={deviceSlide} pick={pick} setF={setF} lockedEffects={lockedEffects} />}
       </Details>
 
-      {image && (
-        <Details summary={`3D pose${image.pose3d ? ' (on)' : ''}`}>
-          <Pose3DFields slide={image} setF={setF} />
+      {deviceSlide && (
+        <Details summary={`3D pose${deviceSlide.pose3d ? ' (on)' : ''}`}>
+          <Pose3DFields slide={deviceSlide} setF={setF} />
         </Details>
       )}
 

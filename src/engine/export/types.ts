@@ -1,3 +1,4 @@
+import type { VideoSource } from './videoPlayback';
 /** Shared types for the video export pipeline (both the WebCodecs and
  * MediaRecorder-fallback implementations produce the same ExportResult). */
 
@@ -11,6 +12,9 @@ export interface ExportOptions {
   /** Free-plan watermark (see src/engine/overlays.ts drawWatermark). Plan
    * gating lives outside the engine — the caller decides this. */
   watermark?: boolean;
+  /** Video slides' recordings, by asset id: the files for frame-accurate
+   * decoding (WebCodecs path) and the live players (MediaRecorder path). */
+  videos?: Record<string, VideoSource>;
 }
 
 export interface ExportResult {

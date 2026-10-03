@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getSfxEvents, playableClips, playSfx, scheduleClip, type SfxEvent } from '@/engine/audio';
+import { videoSoundClips } from '@/engine/audio/clips';
 import { FORMATS } from '@/engine/constants';
 import { withElementCollector, type ElementReport } from '@/engine/elements';
 import { customFontsInUse } from '@/engine/customFonts';
 import { ensureProjectFonts } from '@/engine/fonts';
 import '@/components/customFontLoader';
 import { localizeProject } from '@/engine/localization';
+import { syncVideos } from '@/engine/export/videoPlayback';
 import { getTimeline, render } from '@/engine/render';
 import '@/components/scriptFontLoader';
 import { useEditorStore } from '@/store/editorStore';
@@ -206,7 +208,7 @@ export function usePlaybackEngine(): PlaybackEngine {
   // Editing audio while it plays (dragging a clip, a fade, the volume
   // slider, a file finishing loading) is heard straight away: reschedule
   // from the playhead, debounced so a drag doesn't restart it every frame.
-  const audioSig = JSON.stringify([project.audio ?? null, project.ducking]);
+  const audioSig = JSON.stringify([project.audio ?? null, project.ducking, videoSoundClips(project)]);
   useEffect(() => {
     if (!playingRef.current) return;
     const id = setTimeout(() => {
@@ -270,10 +272,13 @@ export function usePlaybackEngine(): PlaybackEngine {
         }
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          // A video slide on screen: its recording's current frame joins the images.
+          const videos = assetsRef.current.videos;
+          const frameImages = Object.keys(videos).length ? syncVideos(proj, getTimeline(proj).list, videos, assetsRef.current.images, tRef.current, playingRef.current) : assetsRef.current.images;
           withElementCollector(
             (r) => reported.push(r),
             hiddenRef.current,
-            () => render(ctx, proj, assetsRef.current.images, tRef.current, scaleRef.current, { watermark: planRef.current === 'free' && !previewNoWatermarkRef.current }),
+            () => render(ctx, proj, frameImages, tRef.current, scaleRef.current, { watermark: planRef.current === 'free' && !previewNoWatermarkRef.current }),
           );
           // Publish only when something changed (the list is stable while
           // nothing is edited — boxes are rest positions, not animated).

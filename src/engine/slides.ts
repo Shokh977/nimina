@@ -12,7 +12,7 @@ import { byZ, hasOverride, placeElement, textBox, type Box, type ElementKey, typ
 import { currentTextLocale } from './locales';
 import { resolveMotion3d } from './pose3d';
 import { drawWords, layoutWords, textDur } from './text';
-import type { AssetMap, ClassicSlide, EffectBox, Format, FontDef, ImageAsset, ImageSlide, LayoutRegion, ModelKey, Project, ResolvedStyle, Slide, TextPos, TextSlide } from './types';
+import type { AssetMap, ClassicSlide, EffectBox, Format, FontDef, ImageAsset, ImageSlide, LayoutRegion, ModelKey, Project, ResolvedStyle, Slide, TextPos, TextSlide, VideoClip, VideoSlide } from './types';
 import { clamp, easeInCubic, easeInOutCubic, easeOutBack, easeOutCubic, fontStr, graphemes, imgH, imgW, rgba, rr } from './utils';
 
 /* ---------- layout ---------- */
@@ -181,7 +181,15 @@ export function drawIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
 
 /** `fitText`: shrink the headline/subtitle to fit above the device (see
  * sceneTextLayout) — off for video, on for wide still exports. */
-export function drawScene(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, scene: ImageSlide, style: ResolvedStyle, local: number, W: number, H: number, fitText = false): void {
+/** A video slide's per-frame state (src/engine/video.ts), when drawScene draws one. */
+export interface VideoDrawState {
+  /** Auto-zoom toward a tap, as spotlight's zp (0 = none). */
+  zp: number;
+  focus: { x: number; y: number };
+  ripples: Array<{ x: number; y: number; p: number }>;
+}
+
+export function drawScene(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, scene: ImageSlide, style: ResolvedStyle, local: number, W: number, H: number, fitText = false, video?: VideoDrawState): void {
   const L = layout(W, H, project.format, style.textPos),
     dur = scene.dur,
     c = style.colors,
@@ -227,6 +235,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
       alpha = 1 - eo;
       break;
   }
+  if (video && video.zp > zp) zp = video.zp;
   const scroll = scene.scroll ? easeInOutCubic(clamp((local - 0.9) / Math.max(0.5, dur - 1.7))) : 0;
   const { PW, PH } = geom(L, style.model);
   const fan = scene.layout === 'fan';
@@ -236,7 +245,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
   let fx = 0,
     fy = 0;
   if (zp > 0 && img) {
-    const f = focusLocal(scene.focus, img, PW, PH, scroll, style.model);
+    const f = focusLocal(video ? video.focus : scene.focus, img, PW, PH, scroll, style.model);
     fx = f.x * fk;
     fy = f.y * fk;
   }
@@ -301,7 +310,40 @@ export function drawScene(ctx: CanvasRenderingContext2D, project: Project, asset
   const box: EffectBox = { cx: px, cy: py, w: PW * S, h: PH * S, top: py - PH * S * 0.35 };
   if (zp < 0.5) items.push({ key: 'stickers', z: 1, draw: () => drawSlideEffect(ctx, scene, local, W, H, box, { cx: L.cx, cy: L.cy, w: PW * restS, h: PH * restS }, style, els, device) });
 
-  if (zp > 0.05) {
+  if (video && img && video.ripples.length) {
+    // Tap ripples on the recording: a dot that fades as a ring grows from it.
+    const ripples = video.ripples;
+    items.push({
+      z: 1.5,
+      draw: () =>
+        followParent(ctx, device, W, H, () => {
+          const cs = Math.cos(rot),
+            sn = Math.sin(rot),
+            base = Math.min(PW, PH * 0.5) * 0.075 * S;
+          ctx.save();
+          ctx.lineWidth = Math.max(W, H) * 0.004;
+          for (const r of ripples) {
+            const f = focusLocal(r, img, PW, PH, scroll, style.model);
+            const wx = px + (f.x * cs - f.y * sn) * S,
+              wy = py + (f.x * sn + f.y * cs) * S;
+            const e = easeOutCubic(r.p);
+            ctx.globalAlpha = alpha * (1 - r.p) * 0.55;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(wx, wy, base * (0.55 + 0.25 * e), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = alpha * (1 - r.p) * 0.9;
+            ctx.strokeStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(wx, wy, base * (0.6 + 1.3 * e), 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }),
+    });
+  }
+
+  if (zp > 0.05 && !video) {
     items.push({
       z: 1.5,
       draw: () =>
@@ -707,6 +749,24 @@ export function createImageSlide(id: number, imgAssetId: string | null, override
     cutouts: [],
     style: {},
     ...overrides,
+  };
+}
+
+/** A slide for a screen recording that's just been added (src/engine/video.ts). */
+export function createVideoSlide(id: number, video: VideoClip, overrides: Partial<Omit<VideoSlide, 'id' | 'kind' | 'imgAssetId' | 'video'>> = {}): VideoSlide {
+  return {
+    id,
+    kind: 'video',
+    imgAssetId: null,
+    ...SLIDE_DEFAULTS,
+    focus: { ...SLIDE_DEFAULTS.focus },
+    headline: 'See it *in action*',
+    sub: '',
+    dur: Math.round((video.trimEnd - video.trimStart) * 1000) / 1000,
+    cutouts: [],
+    style: {},
+    ...overrides,
+    video,
   };
 }
 

@@ -101,7 +101,7 @@ export function useBatchExport() {
         for (const format of req.videoFormats) {
           if (controller.signal.aborted) throw abortError();
           patch(locale, { step: `Video ${format}` });
-          const outcome = await exportVideo({ ...project, format }, assets.images, assets.audio, { resolution, watermark: limits.watermark }, controller.signal, (d, t) =>
+          const outcome = await exportVideo({ ...project, format }, assets.images, assets.audio, { resolution, watermark: limits.watermark, videos: assets.videos }, controller.signal, (d, t) =>
             patch(locale, { progress: ((doneUnits + (d / t) * 100) / units) * 100 }),
           );
           langEntries[`${folder}/${appSlug}-${locale}-${format.replace(':', 'x')}.${outcome.ext}`] = new Uint8Array(await outcome.blob.arrayBuffer());

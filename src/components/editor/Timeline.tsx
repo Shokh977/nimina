@@ -57,6 +57,7 @@ export default function Timeline({ project, segments, total, t, onSeek }: { proj
   const selectedSceneId = useEditorStore((s) => s.selectedSceneId);
   const selectScene = useEditorStore((s) => s.selectScene);
   const updateSlide = useEditorStore((s) => s.updateSlide);
+  const updateVideoClip = useEditorStore((s) => s.updateVideoClip);
   const setIntro = useEditorStore((s) => s.setIntro);
   const setOutro = useEditorStore((s) => s.setOutro);
   const moveSlideBefore = useEditorStore((s) => s.moveSlideBefore);
@@ -176,7 +177,11 @@ export default function Timeline({ project, segments, total, t, onSeek }: { proj
       }
       // Shown durations are scaled by Motion speed; the stored value isn't.
       const dur = Math.round(shown * speedFactor * 1000) / 1000;
-      if (seg.type === 'scene') updateSlide(seg.scene!.id, { dur });
+      if (seg.type === 'scene' && seg.scene!.kind === 'video') {
+        // A recording's slide is as long as its trim: the edge moves the trim end (never past the file's end).
+        const v = seg.scene!.video;
+        updateVideoClip(seg.scene!.id, { trimEnd: Math.min(v.duration, Math.max(v.trimStart + MIN_DUR, v.trimStart + dur)) });
+      } else if (seg.type === 'scene') updateSlide(seg.scene!.id, { dur });
       else if (seg.type === 'intro') setIntro({ dur });
       else setOutro({ dur });
     } else if (d.mode === 'reorder') {

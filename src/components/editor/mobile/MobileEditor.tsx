@@ -353,7 +353,7 @@ function MobileTransport({ engine, compact = false }: { engine: PlaybackEngine; 
 
 function SlideStrip() {
   const entries = useSlideEntries();
-  const { inputRef, onAddFiles, pickScreenshots, addTextSlide, addStorySlide } = useAddSlides();
+  const { inputRef, onAddFiles, pickScreenshots, addTextSlide, addStorySlide, videoInputRef, onAddRecording, pickRecording, videoStatus } = useAddSlides();
   const [addOpen, setAddOpen] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
   const selectedKey = entries.find((e) => e.selected)?.key;
@@ -384,6 +384,7 @@ function SlideStrip() {
           <div role="menu" className="absolute right-2 bottom-full z-50 mb-2 w-[min(260px,calc(100vw-16px))] overflow-hidden rounded-[14px] border border-white/[.1] bg-[#12141b] py-1.5 shadow-[0_24px_60px_rgba(0,0,0,.6)]">
             {[
               ['Add screenshot', pickScreenshots],
+              ['Add screen recording', pickRecording],
               ['Add text slide', addTextSlide],
               ['Add story slide', addStorySlide],
             ].map(([label, fn]) => (
@@ -403,6 +404,8 @@ function SlideStrip() {
         </>
       )}
       <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={onAddFiles} />
+      <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={onAddRecording} />
+      {videoStatus && <p className="px-3 pb-2 text-[12.5px] leading-snug text-[#c9cdd8]">{videoStatus}</p>}
     </div>
   );
 }
@@ -470,7 +473,7 @@ function TabBar({ tabs, active, onSelect }: { tabs: readonly EditorTab[]; active
  * here, plus adding slides and the storage meter (the desktop rail's job). */
 function MobileSlideList() {
   const entries = useSlideEntries();
-  const { inputRef, onAddFiles, pickScreenshots, addTextSlide, addStorySlide } = useAddSlides();
+  const { inputRef, onAddFiles, pickScreenshots, addTextSlide, addStorySlide, videoInputRef, onAddRecording, pickRecording, videoStatus } = useAddSlides();
   const projectId = useEditorStore((s) => s.projectId);
   return (
     <div className="grid gap-2 p-3">
@@ -493,6 +496,7 @@ function MobileSlideList() {
       <div className="mt-1 grid gap-2">
         {[
           ['＋ Add screenshot', pickScreenshots],
+          ['＋ Add screen recording', pickRecording],
           ['＋ Add text slide', addTextSlide],
           ['＋ Add story slide', addStorySlide],
         ].map(([label, fn]) => (
@@ -501,6 +505,8 @@ function MobileSlideList() {
           </button>
         ))}
         <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={onAddFiles} />
+      <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={onAddRecording} />
+      {videoStatus && <p className="px-3 pb-2 text-[12.5px] leading-snug text-[#c9cdd8]">{videoStatus}</p>}
       </div>
       {projectId && <StorageMeter compact onlyNearLimit wrapperClassName="mt-2 rounded-xl border border-white/[.07] bg-white/[.03] p-3" />}
       <p className="mt-1 text-[12.5px] leading-snug text-[#767e8d]">

@@ -12,7 +12,7 @@ export interface StorageUsage {
   plan: Plan;
 }
 
-export type UploadKind = 'image' | 'audio' | 'thumbnail' | 'template-preview' | 'music-library';
+export type UploadKind = 'image' | 'audio' | 'video' | 'thumbnail' | 'template-preview' | 'music-library';
 
 export const UPLOAD_RULES: Record<UploadKind, { maxBytes: number; types: string[]; label: string }> = {
   image: { maxBytes: 15 * 1024 * 1024, types: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'], label: 'Images (PNG, JPEG, WebP or GIF) up to 15 MB' },
@@ -21,6 +21,8 @@ export const UPLOAD_RULES: Record<UploadKind, { maxBytes: number; types: string[
     types: ['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg', 'audio/webm', 'audio/flac'],
     label: 'Audio (MP3, M4A, AAC, WAV, OGG or FLAC) up to 25 MB',
   },
+  // Screen recordings for video slides (also capped at 60 s, checked when added).
+  video: { maxBytes: 100 * 1024 * 1024, types: ['video/mp4', 'video/quicktime', 'video/webm'], label: 'Screen recordings (MP4, MOV or WebM) up to 100 MB and 60 seconds' },
   thumbnail: { maxBytes: 1024 * 1024, types: ['image/jpeg'], label: 'Thumbnail' },
   'template-preview': { maxBytes: 100 * 1024 * 1024, types: ['video/mp4', 'video/webm'], label: 'Preview video up to 100 MB' },
   // Admin music library: always our transcoded 128 kbps MP3 (~1 MB/min) — 20 MB ≈ 20 minutes.

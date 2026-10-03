@@ -71,7 +71,7 @@ async function signedUpload(kind: UploadKind, projectId: string, assetId: string
  * would go over the storage limit (from the last known usage — the server
  * still enforces it either way). Only applies when the
  * project is saved (projectId set); unsaved editor sessions keep files local. */
-export function rejectUpload(file: File, projectId: string | null | undefined, kind: 'image' | 'audio' = 'image'): boolean {
+export function rejectUpload(file: File, projectId: string | null | undefined, kind: 'image' | 'audio' | 'video' = 'image'): boolean {
   if (!projectId) return false;
   const problem = checkUpload(kind, file.type, file.size) ?? (usageCache && usageCache.used + file.size > usageCache.limit ? quotaMessage(usageCache) : null);
   if (!problem) return false;
@@ -81,7 +81,7 @@ export function rejectUpload(file: File, projectId: string | null | undefined, k
 
 /** Uploads a screenshot/icon (or a music file) for a project. Failures are
  * also announced to the editor (SaveStatusBadge) so they aren't silent. */
-export async function uploadAsset(projectId: string, assetId: string, file: File | Blob, kind: 'image' | 'audio' = file.type.startsWith('audio/') ? 'audio' : 'image'): Promise<void> {
+export async function uploadAsset(projectId: string, assetId: string, file: File | Blob, kind: 'image' | 'audio' | 'video' = file.type.startsWith('audio/') ? 'audio' : file.type.startsWith('video/') ? 'video' : 'image'): Promise<void> {
   try {
     await signedUpload(kind, projectId, assetId, file);
   } catch (err) {

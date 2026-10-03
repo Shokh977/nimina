@@ -37,7 +37,7 @@ function Row({ selected, hidden, colorA, colorB, name, duration, onSelect, onTog
 export default function SlideRail() {
   const projectId = useEditorStore((s) => s.projectId);
   const entries = useSlideEntries();
-  const { inputRef, onAddFiles, pickScreenshots, addTextSlide, addStorySlide } = useAddSlides();
+  const { inputRef, onAddFiles, pickScreenshots, addTextSlide, addStorySlide, videoInputRef, onAddRecording, pickRecording, videoStatus } = useAddSlides();
 
   return (
     <div className="flex h-full flex-col p-3">
@@ -67,6 +67,13 @@ export default function SlideRail() {
           ＋ Add screenshot
         </button>
         <button
+          onClick={pickRecording}
+          className="rounded-[10px] border border-dashed border-white/[.18] bg-white/[.02] px-3 py-2.5 text-[12.5px] font-semibold text-[#c9cdd8] transition-colors duration-[.16s] hover:border-[#8b7dff]/50 hover:bg-[#5b4bff]/[.08] hover:text-white"
+        >
+          ＋ Add screen recording
+        </button>
+        {videoStatus && <p className="px-1 text-[12px] leading-snug text-[#c9cdd8]">{videoStatus}</p>}
+        <button
           onClick={addTextSlide}
           className="rounded-[10px] border border-dashed border-white/[.18] bg-white/[.02] px-3 py-2.5 text-[12.5px] font-semibold text-[#c9cdd8] transition-colors duration-[.16s] hover:border-[#8b7dff]/50 hover:bg-[#5b4bff]/[.08] hover:text-white"
         >
@@ -79,6 +86,7 @@ export default function SlideRail() {
           ＋ Add story slide
         </button>
         <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={onAddFiles} />
+        <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={onAddRecording} />
       </div>
 
       <div className="mt-auto pt-3">

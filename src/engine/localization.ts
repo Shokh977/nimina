@@ -56,7 +56,7 @@ function slideStrings(s: Slide): LocalizableString[] {
   }
   add('headline', s.headline);
   add('sub', s.sub);
-  if (s.kind === 'image') {
+  if (s.kind === 'image' || s.kind === 'video') {
     add('badge', s.badge);
     add('callout', s.callout);
   }

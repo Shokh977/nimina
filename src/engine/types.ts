@@ -247,6 +247,9 @@ export interface AudioClip {
   volume: number;
   fadeIn: number;
   fadeOut: number;
+  /** Playback speed (1 = normal). Only set on the clips the engine derives
+   * for a video slide's own sound, which plays at the Motion speed. */
+  rate?: number;
 }
 
 export interface AudioTrack {
@@ -325,6 +328,43 @@ export interface ImageSlide extends SlideBase {
   kind: 'image';
   /** key into the AssetMap passed to render(); null if no image assigned yet */
   imgAssetId: string | null;
+}
+
+/** A moment in a screen recording where the user tapped — marked by
+ * clicking on the video in the slide editor. `t` is seconds into the file;
+ * x/y are fractions of the video frame. */
+export interface VideoTap {
+  id: string;
+  t: number;
+  x: number;
+  y: number;
+}
+
+export interface VideoClip {
+  /** The uploaded recording (asset id); null until one is added. */
+  assetId: string | null;
+  /** File length and frame size, read when it was added. */
+  duration: number;
+  width: number;
+  height: number;
+  /** The part of the file this slide plays, in seconds. The slide's `dur`
+   * always equals trimEnd - trimStart. */
+  trimStart: number;
+  trimEnd: number;
+  taps: VideoTap[];
+  /** Zoom the device in toward each tap and back out. */
+  autoZoom: boolean;
+  /** Play the recording's own sound (off = silent; music plays over it). */
+  sound: boolean;
+  volume: number;
+}
+
+/** A screen recording playing inside the device frame — everything else
+ * (headline, device, motion, style) works like an image slide. */
+export interface VideoSlide extends SlideBase {
+  kind: 'video';
+  imgAssetId: null;
+  video: VideoClip;
 }
 
 export interface TextSlide extends SlideBase {
@@ -459,12 +499,12 @@ export interface StorySlide {
   stillTime?: number | null;
 }
 
-export type Slide = ImageSlide | TextSlide | StorySlide;
+export type Slide = ImageSlide | TextSlide | StorySlide | VideoSlide;
 
-/** ImageSlide | TextSlide — the two "classic" single-screenshot slide kinds,
+/** ImageSlide | TextSlide | VideoSlide — the "classic" single-screen slide kinds,
  * which share SlideBase's full field set (headline/dur/effect/etc). Used
  * where a function only ever operates on those two, never on a StorySlide. */
-export type ClassicSlide = ImageSlide | TextSlide;
+export type ClassicSlide = ImageSlide | TextSlide | VideoSlide;
 
 export interface IntroConfig {
   on: boolean;

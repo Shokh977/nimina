@@ -7,7 +7,7 @@ import { recount, reserve } from '@/lib/storage/usage';
 import { createClient } from '@/lib/supabase/server';
 
 const Body = z.object({
-  kind: z.enum(['image', 'audio', 'thumbnail', 'template-preview', 'music-library']),
+  kind: z.enum(['image', 'audio', 'video', 'thumbnail', 'template-preview', 'music-library']),
   projectId: z.string().regex(SAFE_SEGMENT),
   assetId: z.string().regex(SAFE_SEGMENT).optional(),
   contentType: z.string().max(100),

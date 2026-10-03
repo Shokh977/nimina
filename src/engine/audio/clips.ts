@@ -7,6 +7,7 @@
  */
 import { scheduleDucking } from './music';
 import type { SfxEvent } from './events';
+import { getTimeline } from '../render';
 import type { AudioClip, AudioTrack, Project } from '../types';
 
 export const DEFAULT_MUSIC_VOLUME = 0.8;
@@ -60,14 +61,14 @@ export function newMusicClip(id: string, assetId: string, name: string, bpm?: nu
 export function clipWindow(clip: AudioClip, total: number, bufferDuration?: number): { start: number; end: number } {
   const start = Math.max(0, Math.min(clip.start, total));
   let end = clip.duration === null ? total : Math.min(total, clip.start + clip.duration);
-  if (!clip.loop && bufferDuration !== undefined) end = Math.min(end, clip.start + Math.max(0, bufferDuration - clip.sourceOffset));
+  if (!clip.loop && bufferDuration !== undefined) end = Math.min(end, clip.start + Math.max(0, bufferDuration - clip.sourceOffset) / (clip.rate ?? 1));
   return { start, end: Math.max(start, end) };
 }
 
 /** Where in the file the clip is playing at timeline time `t` (inside its window). */
 export function sourceTimeAt(clip: AudioClip, t: number, bufferDuration: number): number {
   const loopStart = clampOffset(clip.sourceOffset, bufferDuration);
-  const pos = loopStart + (t - clip.start);
+  const pos = loopStart + (t - clip.start) * (clip.rate ?? 1);
   if (!clip.loop || pos < bufferDuration) return pos;
   const span = bufferDuration - loopStart;
   return span > 0 ? loopStart + ((pos - loopStart) % span) : loopStart;
@@ -113,6 +114,7 @@ export function scheduleClip(ctx: BaseAudioContext, dest: AudioNode, clip: Audio
 
   const src = ctx.createBufferSource();
   src.buffer = buffer;
+  if (clip.rate && clip.rate !== 1) src.playbackRate.value = clip.rate;
   if (clip.loop) {
     src.loop = true;
     src.loopStart = clampOffset(clip.sourceOffset, buffer.duration);
@@ -168,9 +170,25 @@ export function migrateLegacyAudio(p: Project): Project {
 /** Decoded audio files, keyed by clip.assetId. */
 export type AudioBuffers = Record<string, AudioBuffer>;
 
-/** The audible clips whose files are loaded, paired with their buffers. */
+/** Key of a video recording's decoded sound in the AudioBuffers map. */
+export const videoSoundKey = (assetId: string) => `video:${assetId}`;
+
+/** The sound of every video slide that has it turned on, as clips placed
+ * where the slide plays: from its trim start, at the Motion speed, with
+ * short fades so cuts don't click. */
+export function videoSoundClips(p: Project): AudioClip[] {
+  const rate = p.motionSpeed / 100;
+  return getTimeline(p).list.flatMap((seg) => {
+    const s = seg.scene;
+    if (!s || s.kind !== 'video' || !s.video.sound || !s.video.assetId) return [];
+    return [{ id: `video-${s.id}`, assetId: videoSoundKey(s.video.assetId), name: 'Recording sound', start: seg.start, duration: seg.dur, sourceOffset: s.video.trimStart, loop: false, volume: s.video.volume, fadeIn: 0.03, fadeOut: 0.06, rate }];
+  });
+}
+
+/** The audible clips whose files are loaded, paired with their buffers —
+ * the timeline's audio tracks plus video slides' own sound. */
 export function playableClips(p: Project, buffers: AudioBuffers): Array<{ clip: AudioClip; buffer: AudioBuffer }> {
-  return audibleClips(p).flatMap((clip) => {
+  return [...audibleClips(p), ...videoSoundClips(p)].flatMap((clip) => {
     const buffer = buffers[clip.assetId];
     return buffer && buffer.duration > 0 ? [{ clip, buffer }] : [];
   });

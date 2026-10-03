@@ -712,6 +712,32 @@ touch. Overlapping elements: the smallest under the pointer wins; stickers
 `src/store/elementOps.ts`, so they're undoable and autosaved. Story slides
 have their own editor and no canvas elements.
 
+## Video slides (screen recordings)
+
+`kind: 'video'` slides (`VideoSlide` in `src/engine/types.ts`) play a screen
+recording inside the device frame; everything else (headline, device,
+motion, 3D pose, style) works as on an image slide — render.ts draws one as
+an image slide whose screen is the recording's current frame. `video`
+holds the asset id, file length/size, the trim (`trimStart`/`trimEnd`; the
+slide's `dur` always equals their difference, kept by the store's
+`updateVideoClip`), taps, auto-zoom, and sound on/volume. The recording
+plays at the Motion speed. Limits: MP4/MOV/WebM, 100 MB (upload kind
+`video`), 60 s, all plans; counts toward storage.
+
+The engine stays pure: `src/engine/video.ts` only maps time → file time,
+and file time → zoom (`videoZoomAt`: push in ahead of each tap, runs of
+taps < 1.7 s apart stay zoomed and pan) and ripples. The caller puts the
+frame in `assets` under the clip's asset id before `render()`: the live
+preview via a muted `<video>` per recording kept in step and copied to a
+canvas (`export/videoPlayback.ts` `syncVideos`); the WebCodecs export by
+decoding the exact frame with mediabunny (`export/videoFrames.ts`); the
+real-time MediaRecorder fallback with its own cloned players. A
+recording's own sound is decoded into the audio buffers (`video:<id>`) and
+mixed through `scheduleClip` like music (`videoSoundClips`), so preview and
+export agree. Editor: "＋ Add screen recording" in the slide rail; the
+slide inspector's `VideoClipEditor` (click the video to mark a tap, trim
+handles, tap list, toggles); the timeline's slide edge moves the trim end.
+
 ## Custom fonts (Pro)
 
 Upload .woff2/.ttf/.otf (≤ 2 MB, ≤ 10 per account) in Look → Typeface →

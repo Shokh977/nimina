@@ -9,6 +9,7 @@ import { getSfxEvents, playableClips, playSfx, scheduleClip, type AudioBuffers }
 import { getTimeline, render } from '../render';
 import type { AssetMap, Project } from '../types';
 import { outputDimensions } from './resolution';
+import { cloneVideoSources, pauseVideos, syncVideos } from './videoPlayback';
 import { EXPORT_ABORT_ERROR_NAME, type ExportOptions, type ExportResult } from './types';
 
 function pickMime(): string {
@@ -31,7 +32,7 @@ export async function exportVideoMediaRecorder(
   signal: AbortSignal,
   onProgress?: (framesRendered: number, totalFrames: number) => void,
 ): Promise<ExportResult> {
-  const { total } = getTimeline(project);
+  const { total, list } = getTimeline(project);
   if (!total) throw new Error('Add at least one slide before exporting.');
   if (typeof MediaRecorder === 'undefined' || !HTMLCanvasElement.prototype.captureStream) {
     throw new Error("This browser can't record video. Open the page in Chrome, Edge or Safari.");
@@ -50,6 +51,7 @@ export async function exportVideoMediaRecorder(
   if (!ctx) throw new Error('Could not create a 2D canvas context.');
   render(ctx, project, images, 0, scale, { watermark: options.watermark });
 
+  const videos = options.videos && Object.keys(options.videos).length ? await cloneVideoSources(options.videos) : null;
   const stream = canvas.captureStream(30);
   const sfxEvents = getSfxEvents(project);
   const clips = playableClips(project, audio);
@@ -116,7 +118,8 @@ export async function exportVideoMediaRecorder(
         return;
       }
       const et = (now - t0) / 1000;
-      render(ctx, project, images, Math.min(et, total), scale, { watermark: options.watermark });
+      const frameAssets = videos ? syncVideos(project, list, videos, images, Math.min(et, total), true) : images;
+      render(ctx, project, frameAssets, Math.min(et, total), scale, { watermark: options.watermark });
       onProgress?.(Math.min(totalFrames, Math.round((et / total) * totalFrames)), totalFrames);
       if (et >= total + 0.15) {
         resolve();
@@ -128,6 +131,7 @@ export async function exportVideoMediaRecorder(
   });
 
   recorder.stop();
+  if (videos) pauseVideos(videos);
   for (const src of audioSrcs) {
     try {
       src.stop();

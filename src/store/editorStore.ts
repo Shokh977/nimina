@@ -20,7 +20,7 @@ import { create } from 'zustand';
 import { PRESETS } from '@/engine/constants';
 import { collectStrings, hashText, newLanguageEntry } from '@/engine/localization';
 import { createDefaultProject, normalizeProject } from '@/engine/project';
-import { createImageSlide, createTextSlide } from '@/engine/slides';
+import { createImageSlide, createTextSlide, createVideoSlide } from '@/engine/slides';
 import type {
   LanguageEntry,
   Action,
@@ -42,7 +42,10 @@ import type {
   TextSlide,
   CustomFontRef,
   AudioClip,
+  VideoClip,
+  VideoSlide,
 } from '@/engine/types';
+import type { VideoSource } from '@/engine/export/videoPlayback';
 import { musicClip, newMusicClip } from '@/engine/audio/clips';
 import { newAssetId } from '@/lib/assetSrc';
 import { PLAN_LIMITS, type Plan } from '@/lib/plan';
@@ -54,6 +57,8 @@ export interface EditorAssets {
   images: AssetMap;
   /** decoded Web Audio buffers, keyed by the audio clips' assetId */
   audio: Record<string, AudioBuffer>;
+  /** screen recordings (video slides), keyed by the clip's assetId */
+  videos: Record<string, VideoSource>;
 }
 
 interface History {
@@ -143,7 +148,12 @@ interface EditorState {
   addImageSlide: (assetId: string, overrides?: Partial<ImageSlide>) => string;
   addTextSlide: (overrides?: Partial<TextSlide>) => string;
   addStorySlide: () => string;
-  updateSlide: (id: number, patch: Partial<ImageSlide> | Partial<TextSlide> | Partial<StorySlide>) => void;
+  updateSlide: (id: number, patch: Partial<ImageSlide> | Partial<TextSlide> | Partial<StorySlide> | Partial<VideoSlide>) => void;
+  registerVideo: (assetId: string, source: VideoSource) => void;
+  /** Adds a video slide for a recording already registered with registerVideo. */
+  addVideoSlide: (clip: VideoClip) => string;
+  /** Changes a video slide's clip; keeps the slide's length equal to its trim. */
+  updateVideoClip: (id: number, patch: Partial<VideoClip>) => void;
   replaceSlideImage: (id: number, assetId: string, image: ImageAsset) => void;
   removeSlide: (id: number) => void;
   duplicateSlide: (id: number) => void;
@@ -359,7 +369,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
   return {
     project: initialProject,
-    assets: { images: {}, audio: {} },
+    assets: { images: {}, audio: {}, videos: {} },
     canUndo: false,
     canRedo: false,
     projectId: null,
@@ -428,7 +438,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
       set(() => ({
         project: normalized,
         projectId,
-        assets: { images: { ...(assets?.images ?? {}) }, audio: { ...(assets?.audio ?? {}) } },
+        assets: { images: { ...(assets?.images ?? {}) }, audio: { ...(assets?.audio ?? {}) }, videos: { ...(assets?.videos ?? {}) } },
         canUndo: false,
         canRedo: false,
         selectedSceneId: defaultSelection(normalized),
@@ -523,6 +533,21 @@ export const useEditorStore = create<EditorState>((set, get) => {
       set({ selectedSceneId: id });
       return String(id);
     },
+    registerVideo: (assetId, source) => set((s) => ({ assets: { ...s.assets, videos: { ...s.assets.videos, [assetId]: source } } })),
+    addVideoSlide: (clip) => {
+      const id = nextId++;
+      update((p) => ({ ...p, scenes: [...p.scenes, createVideoSlide(id, clip)] }));
+      set({ selectedSceneId: id });
+      return String(id);
+    },
+    updateVideoClip: (id, patch) =>
+      update((p) =>
+        mapSlide(p, id, (s) => {
+          if (s.kind !== 'video') return s;
+          const video = { ...s.video, ...patch };
+          return { ...s, video, dur: Math.round((video.trimEnd - video.trimStart) * 1000) / 1000 };
+        }),
+      ),
     addTextSlide: (overrides) => {
       const id = nextId++;
       update((p) => ({ ...p, scenes: [...p.scenes, createTextSlide(id, overrides)] }));

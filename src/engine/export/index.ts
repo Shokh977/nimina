@@ -8,6 +8,8 @@ import { EXPORT_ABORT_ERROR_NAME, type ExportOptions, type ExportResult } from '
 import { exportVideoWebCodecs } from './webcodecsExporter';
 
 export * from './types';
+export { loadVideoSource, pauseVideos, syncVideos, UnplayableVideoError, type VideoSource } from './videoPlayback';
+export { VideoFrameFeeder } from './videoFrames';
 export { exportVideoWebCodecs } from './webcodecsExporter';
 export { ensureProjectFonts } from '../fonts';
 export { exportVideoMediaRecorder } from './mediaRecorderExporter';

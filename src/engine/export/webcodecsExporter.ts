@@ -8,6 +8,7 @@
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from 'mediabunny';
 
 import { getSfxEvents, playableClips, renderProjectAudio, type AudioBuffers } from '../audio';
+import { VideoFrameFeeder } from './videoFrames';
 import { getTimeline, render } from '../render';
 import type { AssetMap, Project } from '../types';
 import { outputDimensions } from './resolution';
@@ -40,7 +41,7 @@ export async function exportVideoWebCodecs(
   signal: AbortSignal,
   onProgress?: (framesRendered: number, totalFrames: number) => void,
 ): Promise<ExportResult> {
-  const { total } = getTimeline(project);
+  const { total, list } = getTimeline(project);
   if (!total) throw new Error('Add at least one slide before exporting.');
 
   const fps = options.fps ?? 30;
@@ -73,11 +74,15 @@ export async function exportVideoWebCodecs(
 
   const totalFrames = Math.max(1, Math.ceil(total * fps));
 
+  const videos = options.videos ?? {};
+  const feeder = Object.keys(videos).length ? new VideoFrameFeeder(Object.fromEntries(Object.entries(videos).map(([id, v]) => [id, v.blob]))) : null;
+
   try {
     for (let i = 0; i < totalFrames; i++) {
       checkAbort(signal);
       const t = Math.min(i / fps, total);
-      render(ctx, project, images, t, scale, { watermark: options.watermark });
+      const frameAssets = feeder ? await feeder.assetsAt(project, list, images, t) : images;
+      render(ctx, project, frameAssets, t, scale, { watermark: options.watermark });
       await videoSource.add(i / fps, 1 / fps);
       onProgress?.(i + 1, totalFrames);
       await nextFrame();
@@ -96,6 +101,8 @@ export async function exportVideoWebCodecs(
   } catch (err) {
     await output.cancel().catch(() => {});
     throw err;
+  } finally {
+    await feeder?.close();
   }
 
   const buffer = bufferTarget.buffer;

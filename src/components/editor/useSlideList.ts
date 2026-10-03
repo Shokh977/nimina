@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
+import { UnplayableVideoError } from '@/engine/export/videoPlayback';
 import { resolveStyle } from '@/engine/render';
 import { getStoryTimeline } from '@/engine/story';
 import type { ImageAsset, Slide } from '@/engine/types';
@@ -9,6 +10,8 @@ import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from './PlaybackContext';
+import { MAX_RECORDING_SECONDS, openRecording } from './video/recordings';
+import { newVideoClip } from '@/engine/video';
 
 /** One row of the slide list — intro, each slide, outro — shared by the
  * desktop SlideRail and the phone's SlideStrip. */
@@ -34,7 +37,7 @@ function rawDuration(s: Slide): number {
 
 function slideName(s: Slide, i: number): string {
   if (s.kind === 'story') return `Story ${i + 1}`;
-  return s.headline.replace(/\*/g, '') || (s.kind === 'text' ? `Text ${i + 1}` : `Slide ${i + 1}`);
+  return s.headline.replace(/\*/g, '') || (s.kind === 'text' ? `Text ${i + 1}` : s.kind === 'video' ? `Recording ${i + 1}` : `Slide ${i + 1}`);
 }
 
 // Sample screenshots are canvases; encoding one to a data URL is costly, so
@@ -53,6 +56,7 @@ function thumbOf(asset: ImageAsset | undefined): string | null {
 export function useSlideEntries(): SlideEntry[] {
   const project = useEditorStore((s) => s.project);
   const images = useEditorStore((s) => s.assets.images);
+  const videos = useEditorStore((s) => s.assets.videos);
   const selectedSceneId = useEditorStore((s) => s.selectedSceneId);
   const selectScene = useEditorStore((s) => s.selectScene);
   const updateSlide = useEditorStore((s) => s.updateSlide);
@@ -98,7 +102,7 @@ export function useSlideEntries(): SlideEntry[] {
       selected: selectedSceneId === slide.id,
       colorA: style.colors.a,
       colorB: style.colors.b,
-      thumb: thumbId ? thumbOf(images[thumbId]) : null,
+      thumb: slide.kind === 'video' ? (slide.video.assetId ? thumbOf(videos[slide.video.assetId]?.poster) : null) : thumbId ? thumbOf(images[thumbId]) : null,
       onSelect: () => {
         selectScene(slide.id);
         if (!slide.hidden) seek(startAt);
@@ -157,5 +161,38 @@ export function useAddSlides() {
     }
   };
 
-  return { inputRef, onAddFiles, pickScreenshots: () => inputRef.current?.click(), addTextSlide: () => addTextSlide(), addStorySlide: () => addStorySlide() };
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const addVideoSlide = useEditorStore((s) => s.addVideoSlide);
+  const [videoStatus, setVideoStatus] = useState('');
+  const onAddRecording = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || rejectUpload(file, projectId, 'video')) return;
+    setVideoStatus('Opening the recording…');
+    const assetId = newAssetId('video');
+    try {
+      const source = await openRecording(assetId, file);
+      if (source.duration > MAX_RECORDING_SECONDS + 0.5) {
+        setVideoStatus(`Recordings can be up to ${MAX_RECORDING_SECONDS} seconds — this one is ${Math.round(source.duration)}. Shorten it on your phone or computer first.`);
+        return;
+      }
+      addVideoSlide(newVideoClip(assetId, Math.round(source.duration * 1000) / 1000, source.width, source.height));
+      if (projectId) uploadAsset(projectId, assetId, file, 'video').catch((err) => console.error('[assets] upload failed', err));
+      setVideoStatus('');
+    } catch (err) {
+      setVideoStatus(err instanceof UnplayableVideoError ? err.message : "That recording couldn't be opened.");
+    }
+  };
+
+  return {
+    inputRef,
+    onAddFiles,
+    pickScreenshots: () => inputRef.current?.click(),
+    addTextSlide: () => addTextSlide(),
+    addStorySlide: () => addStorySlide(),
+    videoInputRef,
+    onAddRecording,
+    pickRecording: () => videoInputRef.current?.click(),
+    videoStatus,
+  };
 }

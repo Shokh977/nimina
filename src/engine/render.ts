@@ -13,7 +13,8 @@ import { getStoryTimeline, renderStory } from './story';
 import { withTextLocale } from './locales';
 import { layoutWords, drawWords } from './text';
 import { drawTransition } from './transitions';
-import type { AssetMap, IntroConfig, OutroConfig, Project, ResolvedStyle, Segment, Slide, SlideStyle, Timeline } from './types';
+import type { AssetMap, ImageSlide, IntroConfig, OutroConfig, Project, ResolvedStyle, Segment, Slide, SlideStyle, Timeline, VideoSlide } from './types';
+import { videoRipplesAt, videoSourceTime, videoZoomAt } from './video';
 import { easeInOutCubic } from './utils';
 
 function slideDuration(s: Slide, speedFactor: number): number {
@@ -38,7 +39,7 @@ export function getTimeline(project: Project): Timeline {
   project.scenes.forEach((s, i) => {
     if (s.hidden) return;
     const dur = slideDuration(s, speedFactor);
-    list.push({ type: 'scene', owner: s, scene: s, start: t, dur, label: (s.kind === 'text' ? 'Aa ' : s.kind === 'story' ? '▶ ' : '') + (i + 1) });
+    list.push({ type: 'scene', owner: s, scene: s, start: t, dur, label: (s.kind === 'text' ? 'Aa ' : s.kind === 'story' ? '▶ ' : s.kind === 'video' ? '● ' : '') + (i + 1) });
     t += dur;
   });
   if (project.outro.on) {
@@ -104,6 +105,16 @@ export function render(ctx: CanvasRenderingContext2D, project: Project, assets: 
   }
 }
 
+/** A video slide is an image slide whose screen is the recording's current
+ * frame — the caller has put that frame in `assets` under the clip's asset
+ * id (src/engine/video.ts) — plus tap auto-zoom and ripples. */
+function drawVideoScene(ctx: CanvasRenderingContext2D, project: Project, assets: AssetMap, scene: VideoSlide, st: ResolvedStyle, local: number, W: number, H: number, fitText?: boolean): void {
+  const s = videoSourceTime(scene, local, project.motionSpeed / 100);
+  const { zp, focus } = videoZoomAt(scene.video, s);
+  const asImage: ImageSlide = { ...scene, kind: 'image', imgAssetId: scene.video.assetId, scroll: false, cutouts: [] };
+  drawScene(ctx, project, assets, asImage, st, local, W, H, fitText, { zp, focus, ripples: videoRipplesAt(scene.video, s) });
+}
+
 export interface RenderOptions {
   watermark?: boolean;
   size?: { w: number; h: number };
@@ -160,6 +171,7 @@ function renderFrame(ctx: CanvasRenderingContext2D, project: Project, assets: As
     } else {
       applyCamera(ctx, seg.scene.camera, local, seg.dur, W, H);
       if (seg.scene.kind === 'text') drawTextSlide(ctx, project, seg.scene, st, local, W, H);
+      else if (seg.scene.kind === 'video') drawVideoScene(ctx, project, assets, seg.scene, st, local, W, H, options?.fitText);
       else drawScene(ctx, project, assets, seg.scene, st, local, W, H, options?.fitText);
     }
   }
