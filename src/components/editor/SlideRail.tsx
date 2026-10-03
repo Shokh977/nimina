@@ -6,7 +6,7 @@ import { resolveStyle } from '@/engine/render';
 import { getStoryTimeline } from '@/engine/story';
 import type { Slide } from '@/engine/types';
 import { loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { uploadAsset } from '@/lib/storage/assets';
+import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from './PlaybackContext';
 import SectionLabel from './ui/SectionLabel';
@@ -69,6 +69,7 @@ export default function SlideRail() {
     const files = [...(e.target.files ?? [])];
     e.target.value = '';
     for (const file of files) {
+      if (rejectUpload(file, projectId)) continue;
       try {
         const { image } = await loadImageFile(file);
         const assetId = newAssetId('img');

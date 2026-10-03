@@ -5,7 +5,7 @@ import { useRef } from 'react';
 import { snapToBeat } from '@/engine/audio';
 import type { Action, ImageAsset, StorySlide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { uploadAsset } from '@/lib/storage/assets';
+import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from '../../PlaybackContext';
 import { sceneStart } from '../../timelineHelpers';
@@ -351,7 +351,7 @@ function IconAssetField({ label, assetId, onChange }: { label: string; assetId?:
  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
  const file = e.target.files?.[0];
  e.target.value = '';
- if (!file) return;
+ if (!file || rejectUpload(file, projectId)) return;
  const { image } = await loadImageFile(file);
  const id = newAssetId('icon');
  registerImage(id, image);

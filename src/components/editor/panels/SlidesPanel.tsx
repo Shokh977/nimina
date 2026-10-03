@@ -4,7 +4,7 @@ import { useRef } from 'react';
 
 import { DURS } from '@/engine/constants';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { uploadAsset } from '@/lib/storage/assets';
+import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from '../PlaybackContext';
 import StyleEditor from '../StyleEditor';
@@ -49,7 +49,7 @@ export default function SlidesPanel() {
   const onIconFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
+    if (!file || rejectUpload(file, projectId)) return;
     const { image } = await loadImageFile(file);
     const assetId = newAssetId('icon');
     setIcon(assetId, image);

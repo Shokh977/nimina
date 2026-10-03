@@ -7,7 +7,7 @@ import type { TextAnim, Transition } from '@/engine/types';
 import { newAssetId } from '@/lib/assetSrc';
 import { createClient } from '@/lib/supabase/client';
 import { getMusicLibraryUrl, listMusicLibrary, type MusicLibraryTrack } from '@/lib/supabase/musicLibrary';
-import { uploadAsset } from '@/lib/storage/assets';
+import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import Details from '../ui/Details';
 import RangeInput from '../ui/RangeInput';
@@ -66,7 +66,7 @@ export default function MotionPanel() {
   const onMusicFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
+    if (!file || rejectUpload(file, projectId, 'audio')) return;
     setMusicStatus('Loading…');
     try {
       const arrayBuffer = await file.arrayBuffer();

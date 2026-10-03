@@ -6,7 +6,7 @@ import { ANIMS, CAMERAS, DEFAULT_COUNTER, DURS, EFFECTS, GESTURES, LAYOUTS, MOTI
 import type { ClassicSlide, CounterConfig, CounterFormat, Effect, ImageSlide, Pose3D, PosePresetKey, Slide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { isPro, PRO_ONLY_EFFECTS } from '@/lib/plan';
-import { uploadAsset } from '@/lib/storage/assets';
+import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from '../PlaybackContext';
 import StyleEditor from '../StyleEditor';
@@ -97,7 +97,7 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
   const onReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !image) return;
+    if (!file || !image || rejectUpload(file, projectId)) return;
     const { image: newImage } = await loadImageFile(file);
     const assetId = newAssetId('img');
     replaceSlideImage(slide.id, assetId, newImage);

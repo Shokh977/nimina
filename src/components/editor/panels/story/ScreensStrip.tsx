@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 
 import type { StorySlide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { uploadAsset } from '@/lib/storage/assets';
+import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 
 /** The story slide's full/tall screenshots — referenced by id from
@@ -33,14 +33,14 @@ export default function ScreensStrip({ slide }: { slide: StorySlide }) {
  const onAddFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
  const file = e.target.files?.[0];
  e.target.value = '';
- if (!file) return;
+ if (!file || rejectUpload(file, projectId)) return;
  addStoryScreen(slide.id, await loadAndRegister(file));
  };
 
  const onReplaceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
  const file = e.target.files?.[0];
  e.target.value = '';
- if (!file || !replacingScreenId) return;
+ if (!file || !replacingScreenId || rejectUpload(file, projectId)) return;
  setStoryScreenAsset(slide.id, replacingScreenId, await loadAndRegister(file));
  };
 

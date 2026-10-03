@@ -8,6 +8,7 @@ import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { createClient } from '@/lib/supabase/client';
 import { createProjectFromTemplate } from '@/lib/supabase/projects';
 import { uploadAsset } from '@/lib/storage/assets';
+import { checkUpload } from '@/lib/storage/rules';
 import { getTemplateForWizard, type TemplateWithPreview } from '@/lib/supabase/templates';
 
 /** Modal wizard: shows the template's screenshot "slots", lets the user
@@ -53,6 +54,9 @@ export default function TemplateWizard({ templateId, onClose }: { templateId: st
 
   const onFile = async (slotKey: string, file: File | undefined) => {
     if (!file) return;
+    const problem = checkUpload('image', file.type, file.size);
+    if (problem) return setError(problem);
+    setError('');
     setFiles((prev) => ({ ...prev, [slotKey]: file }));
     try {
       const { image } = await loadImageFile(file);

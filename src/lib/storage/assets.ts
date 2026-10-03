@@ -32,6 +32,19 @@ async function signedUpload(kind: UploadKind, projectId: string, assetId: string
   return { path: signed.path, publicUrl: signed.publicUrl };
 }
 
+/** Checks a picked file against the upload rules BEFORE it's added to the
+ * project — a refused file must never become a slide whose image then
+ * can't load after a reload. Announces the reason (SaveStatusBadge) and
+ * returns true when the file should be skipped. Only applies when the
+ * project is saved (projectId set); unsaved editor sessions keep files local. */
+export function rejectUpload(file: File, projectId: string | null | undefined, kind: 'image' | 'audio' = 'image'): boolean {
+  if (!projectId) return false;
+  const problem = checkUpload(kind, file.type, file.size);
+  if (!problem) return false;
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(UPLOAD_ERROR_EVENT, { detail: problem }));
+  return true;
+}
+
 /** Uploads a screenshot/icon (or a music file) for a project. Failures are
  * also announced to the editor (SaveStatusBadge) so they aren't silent. */
 export async function uploadAsset(projectId: string, assetId: string, file: File | Blob, kind: 'image' | 'audio' = file.type.startsWith('audio/') ? 'audio' : 'image'): Promise<void> {

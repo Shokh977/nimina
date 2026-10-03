@@ -4,7 +4,7 @@ import { useRef } from 'react';
 
 import type { BuiltInSprite, Sprite, StorySlide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
-import { uploadAsset } from '@/lib/storage/assets';
+import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { BUILTIN_SPRITES, EASINGS } from '../../storyFields';
 import Details from '../../ui/Details';
@@ -45,7 +45,7 @@ function SpriteRow({ slide, sprite, onRemove }: { slide: StorySlide; sprite: Spr
  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
  const file = e.target.files?.[0];
  e.target.value = '';
- if (!file) return;
+ if (!file || rejectUpload(file, projectId)) return;
  const { image } = await loadImageFile(file);
  const assetId = newAssetId('sprite');
  registerImage(assetId, image);
