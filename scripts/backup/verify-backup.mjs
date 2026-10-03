@@ -140,6 +140,8 @@ const normalize = (s) =>
   s
     .split('\n')
     .filter((l) => l.trim() && !l.startsWith('--') && !/^(SET|SELECT pg_catalog\.set_config)/.test(l) && !/^\\(un)?restrict /.test(l))
+    // Indentation inside function bodies depends on how the SQL was pasted.
+    .map((l) => l.trim())
     .join('\n');
 const restoredSchema = normalize((await run(bin('pg_dump'), ['--schema-only', '--schema=public', '--no-owner', '--no-privileges', targetUrl])).stdout.toString().replace(/\r\n/g, '\n'));
 const prodSchema = normalize(sql(FILES.publicSchema));

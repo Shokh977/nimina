@@ -37,12 +37,16 @@ export function backupR2() {
 /** Runs a command; resolves with stdout, rejects with stderr on a non-zero exit. */
 export function run(cmd, args, { env, input } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(cmd, args, { env: { ...process.env, PGCLIENTENCODING: 'UTF8', ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
     const out = [];
     const err = [];
     child.stdout.on('data', (d) => out.push(d));
     child.stderr.on('data', (d) => err.push(d));
     child.on('error', reject);
+    // If the program exits early (e.g. psql stopping on an error), writing
+    // the rest of its input fails — ignore that; the exit code and stderr
+    // in 'close' carry the real error.
+    child.stdin.on('error', () => {});
     child.on('close', (code) => {
       const stderr = Buffer.concat(err).toString();
       if (code === 0) resolve({ stdout: Buffer.concat(out), stderr });
