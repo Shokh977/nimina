@@ -16,10 +16,8 @@ export default async function EditorPage(props: PageProps<'/editor/[id]'>) {
 
   // RLS scopes this to the signed-in user's own rows, so a project owned by
   // someone else (or one that doesn't exist) both come back as no row.
-  const project = await getProject(supabase, id);
+  const [project, { data: profile }] = await Promise.all([getProject(supabase, id), supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle()]);
   if (!project) notFound();
-
-  const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle();
   const plan: Plan = profile?.plan === 'pro' ? 'pro' : 'free';
 
   return <EditorShell userEmail={user.email ?? ''} projectId={project.id} projectName={project.name} initialProject={project.data} plan={plan} />;

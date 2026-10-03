@@ -31,10 +31,8 @@ export default async function ProjectsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login?next=/projects');
 
-  const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle();
+  const [{ data: profile }, rows, templateRows] = await Promise.all([supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle(), listProjects(supabase), listEnabledTemplates(supabase)]);
   const plan: Plan = profile?.plan === 'pro' ? 'pro' : 'free';
-
-  const [rows, templateRows] = await Promise.all([listProjects(supabase), listEnabledTemplates(supabase)]);
   const projects: DashboardProject[] = await Promise.all(
     rows.map(async (row) => {
       const thumbnailUrl = row.thumbnail_path && isR2Configured() ? await r2().signGet(r2().bucketName('private'), row.thumbnail_path) : null;

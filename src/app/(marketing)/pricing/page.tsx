@@ -19,11 +19,6 @@ export default async function PricingPage() {
   let plan: 'free' | 'pro' = 'free';
   let hasLifetime = false;
 
-  // Pricing itself is public — even a signed-out visitor needs to see it —
-  // so this is read unconditionally, not gated behind a signed-in check.
-  const anonSupabase = await createClient();
-  const pricing = await getCurrentPricing(anonSupabase);
-
   // Vercel sets this from the visitor's IP; absent locally and on other
   // hosts. Deliberately `null`, never an internal "unknown" placeholder —
   // PricingShell only forwards a country to Paddle's PricePreview when one
@@ -31,19 +26,19 @@ export default async function PricingPage() {
   // geolocation otherwise.
   const countryCode = (await headers()).get('x-vercel-ip-country');
 
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      userEmail = user.email ?? null;
-      userId = user.id;
-      const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle();
-      if (profile?.plan === 'pro') plan = 'pro';
-      const { data: purchase } = await supabase.from('purchases').select('id').eq('user_id', user.id).limit(1).maybeSingle();
-      hasLifetime = !!purchase;
-    }
+  // Pricing itself is public — even a signed-out visitor needs to see it —
+  // so it's read unconditionally, alongside (not after) who's signed in.
+  const supabase = await createClient();
+  const [pricing, user] = await Promise.all([getCurrentPricing(supabase), isSupabaseConfigured() ? supabase.auth.getUser().then((r) => r.data.user) : Promise.resolve(null)]);
+  if (user) {
+    userEmail = user.email ?? null;
+    userId = user.id;
+    const [{ data: profile }, { data: purchase }] = await Promise.all([
+      supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle(),
+      supabase.from('purchases').select('id').eq('user_id', user.id).limit(1).maybeSingle(),
+    ]);
+    if (profile?.plan === 'pro') plan = 'pro';
+    hasLifetime = !!purchase;
   }
 
   return <PricingShell userId={userId} userEmail={userEmail} currentPlan={plan} checkoutAvailable={isPaddleConfigured()} pricing={pricing} hasLifetime={hasLifetime} countryCode={countryCode} />;

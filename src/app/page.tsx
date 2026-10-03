@@ -73,11 +73,14 @@ export default async function HomePage() {
 
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const [
+      {
+        data: { user },
+      },
+      content,
+      templateRows,
+    ] = await Promise.all([supabase.auth.getUser(), getSiteContent(supabase), listEnabledTemplates(supabase)]);
     signedIn = !!user;
-    const [content, templateRows] = await Promise.all([getSiteContent(supabase), listEnabledTemplates(supabase)]);
     siteContent = content;
     templates = templateRows.map(toMarketingCard);
   }

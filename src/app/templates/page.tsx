@@ -11,12 +11,14 @@ export const metadata: Metadata = {
 
 export default async function TemplatesPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
   // Public: signed-out visitors browse the gallery; choosing a template
   // prompts sign-up (TemplatesShell).
-  const templates = await listEnabledTemplates(supabase);
+  const [
+    {
+      data: { user },
+    },
+    templates,
+  ] = await Promise.all([supabase.auth.getUser(), listEnabledTemplates(supabase)]);
 
   return (
     <TemplatesShell
