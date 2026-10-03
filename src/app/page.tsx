@@ -24,8 +24,9 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   keywords: ['app promo video', 'app preview video', 'App Store screenshots', 'Google Play screenshots', 'device mockup', 'app marketing video', 'AI video maker', 'app video translation'],
   alternates: { canonical: '/' },
-  openGraph: { title: TITLE, description: DESCRIPTION, url: '/' },
-  twitter: { title: TITLE, description: DESCRIPTION },
+  // Page-level openGraph/twitter replace the layout's whole object, so the image and card come along explicitly.
+  openGraph: { type: 'website', siteName: 'Nimina', title: TITLE, description: DESCRIPTION, url: '/', images: [{ url: '/brand/og-image.png', width: 1200, height: 630, alt: 'Nimina — App promos that move' }] },
+  twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION, images: ['/brand/og-image.png'] },
 };
 
 /**
