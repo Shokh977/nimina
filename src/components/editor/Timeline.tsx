@@ -6,9 +6,12 @@ import { resolveStyle } from '@/engine/render';
 import type { Project, Segment } from '@/engine/types';
 import { useEditorStore } from '@/store/editorStore';
 import AudioLane, { AUDIO_LANE_H } from './AudioLane';
+import { clipBeats } from './audio/beatSnap';
+import { musicClip } from '@/engine/audio/clips';
 
 function formatDur(s: number): string {
-  return `${s.toFixed(1)}s`;
+  // One decimal, or two when a beat snap put it between tenths.
+  return `${Math.abs(s * 10 - Math.round(s * 10)) > 0.01 ? s.toFixed(2) : s.toFixed(1)}s`;
 }
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -22,6 +25,7 @@ const ZOOM_STEPS = [1, 2, 4, 8] as const;
 const ZOOM_KEY = 'promo-studio:timeline-zoom';
 const SLIDES_H = 58;
 const LANE_GAP = 6;
+const BEAT_SNAP_PX = 7;
 
 type Drag =
   | { mode: 'press'; x0: number; seg: number | null }
@@ -37,7 +41,8 @@ type Drag =
  *
  *  - click anywhere: seek to that exact time (and select the clip under it)
  *  - drag the playhead knob, or drag across the strip: scrub
- *  - drag a clip's right edge: change its duration (0.1s steps)
+ *  - drag a clip's right edge: change its duration (0.1s steps; snaps to
+ *    the music's beats when it has a BPM — Alt to drag freely)
  *  - drag a slide sideways: reorder it among the slides
  *  - ←/→ seek 0.1s (shift: 1s) when the strip has focus
  *
@@ -55,6 +60,8 @@ export default function Timeline({ project, segments, total, t, onSeek }: { proj
   const setIntro = useEditorStore((s) => s.setIntro);
   const setOutro = useEditorStore((s) => s.setOutro);
   const moveSlideBefore = useEditorStore((s) => s.moveSlideBefore);
+  const music = musicClip(project);
+  const musicBuffer = useEditorStore((s) => (music ? s.assets.audio[music.assetId] : undefined));
 
   const [fitWidth, setFitWidth] = useState(0);
   const [zoomIndex, setZoomIndex] = useState(0);
@@ -159,9 +166,16 @@ export default function Timeline({ project, segments, total, t, onSeek }: { proj
         dragRef.current = { ...d, moved: true };
       }
       const seg = segments[d.seg];
-      const shown = Math.max(MIN_DUR, Math.round((d.dur0 + (e.clientX - d.x0) / pxPerSecond) * 10) / 10);
+      let shown = Math.max(MIN_DUR, Math.round((d.dur0 + (e.clientX - d.x0) / pxPerSecond) * 10) / 10);
+      // The edge snaps to the music's beats (Alt: free).
+      if (music?.bpm && musicBuffer && !e.altKey) {
+        const end = seg.start + d.dur0 + (e.clientX - d.x0) / pxPerSecond;
+        let best: number | null = null;
+        for (const b of clipBeats(music, musicBuffer.duration)) if (b - seg.start >= MIN_DUR && Math.abs(b - end) * pxPerSecond <= BEAT_SNAP_PX && (best === null || Math.abs(b - end) < Math.abs(best - end))) best = b;
+        if (best !== null) shown = Math.round((best - seg.start) * 1000) / 1000;
+      }
       // Shown durations are scaled by Motion speed; the stored value isn't.
-      const dur = Math.round(shown * speedFactor * 100) / 100;
+      const dur = Math.round(shown * speedFactor * 1000) / 1000;
       if (seg.type === 'scene') updateSlide(seg.scene!.id, { dur });
       else if (seg.type === 'intro') setIntro({ dur });
       else setOutro({ dur });

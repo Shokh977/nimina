@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { audioTracks, clipGainAt, clipWindow, sourceTimeAt } from '@/engine/audio/clips';
+import { audioTracks, beatTimes, clipGainAt, clipWindow, sourceTimeAt } from '@/engine/audio/clips';
 import type { AudioClip, Project, Segment } from '@/engine/types';
 import { useEditorStore } from '@/store/editorStore';
 import { bufferPeaks, PEAKS_PER_SECOND } from './audio/peaks';
@@ -39,6 +39,7 @@ const round = (v: number, step = 0.05) => Math.round(v / step) * step;
  *    (snaps to slide boundaries and the playhead; Alt = no snap)
  *  - drag the dots at its top corners: fade in / fade out
  *  - click: open its settings in the inspector; Delete removes it
+ * With a BPM the clip shows the song's beats (lines on each bar).
  * With no audio the row is an "＋ Add music" button.
  */
 export default function AudioLane({ project, total, pxPerSecond, segments, t }: { project: Project; total: number; pxPerSecond: number; segments: Segment[]; t: number }) {
@@ -289,6 +290,22 @@ function ClipWave({ clip, buffer, start, end, pxPerSecond, width, height }: { cl
       // Shown against full volume, so a quiet clip looks quieter.
       const h = Math.max(dpr, peak * clipGainAt(clip, start, end, time) * (canvas.height - 4 * dpr));
       ctx.fillRect(x, mid - h / 2, Math.max(1, step - dpr), h);
+    }
+    // Beat markers (with a BPM): a short tick per beat, a full line per bar —
+    // only when they're far enough apart to read.
+    const beats = beatTimes(clip, end, buffer.duration);
+    if (beats.length && (60 / clip.bpm!) * pxPerSecond >= 5) {
+      for (const b of beats) {
+        const x = Math.round((b.t - start) * pxPerSecond * dpr);
+        if (b.bar) {
+          ctx.fillStyle = 'rgba(255,255,255,.55)';
+          ctx.fillRect(x, 0, dpr, canvas.height);
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,.35)';
+          ctx.fillRect(x, 0, dpr, 4 * dpr);
+          ctx.fillRect(x, canvas.height - 4 * dpr, dpr, 4 * dpr);
+        }
+      }
     }
   }, [clip, buffer, start, end, pxPerSecond, width, height]);
   return <canvas ref={ref} aria-hidden className="pointer-events-none absolute top-0.5 left-0.5" style={{ width, height }} />;

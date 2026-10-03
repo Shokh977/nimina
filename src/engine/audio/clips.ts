@@ -175,3 +175,34 @@ export function playableClips(p: Project, buffers: AudioBuffers): Array<{ clip: 
     return buffer && buffer.duration > 0 ? [{ clip, buffer }] : [];
   });
 }
+
+/**
+ * Where the song's beats fall on the timeline while the clip plays — the
+ * file's beat 0 is its first sample (true of the library's tracks), so a
+ * beat is wherever the playing position is a whole number of beats into
+ * the file. Loops restart the count from the loop point's own position.
+ * `bar` marks every 4th beat. Empty without a BPM.
+ */
+export function beatTimes(clip: AudioClip, total: number, bufferDuration: number, bpm = clip.bpm): Array<{ t: number; bar: boolean }> {
+  if (!bpm || bpm <= 0 || bufferDuration <= 0) return [];
+  const beat = 60 / bpm;
+  const { start, end } = clipWindow(clip, total, bufferDuration);
+  const loopStart = clampOffset(clip.sourceOffset, bufferDuration);
+  const out: Array<{ t: number; bar: boolean }> = [];
+  // Walk the runs of the file the clip plays: from the offset to the end, then the loop over and over.
+  let t0 = start;
+  let srcA = loopStart;
+  while (t0 < end && out.length < 20000) {
+    const srcB = bufferDuration;
+    for (let k = Math.ceil(srcA / beat - 1e-9); k * beat < srcB; k++) {
+      const t = t0 + (k * beat - srcA);
+      if (t >= end) break;
+      out.push({ t, bar: k % 4 === 0 });
+    }
+    if (!clip.loop) break;
+    t0 += srcB - srcA;
+    srcA = loopStart;
+    if (srcB - srcA <= 0) break;
+  }
+  return out;
+}

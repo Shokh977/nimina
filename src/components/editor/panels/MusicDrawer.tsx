@@ -9,7 +9,7 @@ import { newAssetId } from '@/lib/assetSrc';
 import { isPro } from '@/lib/plan';
 import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { createClient } from '@/lib/supabase/client';
-import { getMusicLibraryUrl, getMusicTracks, LIBRARY_SORTS, musicLibraryFacets, searchMusicLibrary, type LibrarySort, type MusicLibraryTrack } from '@/lib/supabase/musicLibrary';
+import { getMusicLibraryUrl, getMusicTracks, LIBRARY_SORTS, listFavoriteTrackIds, musicLibraryFacets, searchMusicLibrary, setFavoriteTrack, type LibrarySort, type MusicLibraryTrack } from '@/lib/supabase/musicLibrary';
 import { useEditorStore } from '@/store/editorStore';
 import { getAudioContext } from '../audio/audioContext';
 import SegmentedControl from '../ui/SegmentedControl';
@@ -119,6 +119,9 @@ function Library({ pro, onPick }: { pro: boolean; onPick: (t: MusicLibraryTrack)
   const [genre, setGenre] = useState('');
   const [sort, setSort] = useState<LibrarySort>('featured');
   const [freeOnly, setFreeOnly] = useState(false);
+  const [favOnly, setFavOnly] = useState(false);
+  /** Favourite track ids; null = favourites unavailable (signed out). */
+  const [favIds, setFavIds] = useState<string[] | null>(null);
   const [allMoods, setAllMoods] = useState(false);
   const [facets, setFacets] = useState<{ moods: string[]; genres: string[] }>({ moods: [], genres: [] });
   const [tracks, setTracks] = useState<MusicLibraryTrack[]>([]);
@@ -139,6 +142,9 @@ function Library({ pro, onPick }: { pro: boolean; onPick: (t: MusicLibraryTrack)
     musicLibraryFacets(supabase)
       .then(setFacets)
       .catch(() => {});
+    listFavoriteTrackIds(supabase)
+      .then(setFavIds)
+      .catch(() => {});
     const ids = readRecent();
     if (ids.length)
       getMusicTracks(supabase, ids)
@@ -146,11 +152,13 @@ function Library({ pro, onPick }: { pro: boolean; onPick: (t: MusicLibraryTrack)
         .catch(() => {});
   }, [supabase]);
 
-  const filtered = !!(debounced || mood || genre || freeOnly);
-  const queryKey = JSON.stringify([debounced, mood, genre, sort, freeOnly]);
+  const filtered = !!(debounced || mood || genre || freeOnly || favOnly);
+  // The favourites filter follows the list as it changes only when it's on.
+  const onlyIds = favOnly ? (favIds ?? []) : undefined;
+  const queryKey = JSON.stringify([debounced, mood, genre, sort, freeOnly, onlyIds]);
 
   const fetchPage = useCallback(
-    (offset: number) => searchMusicLibrary(supabase, { search: debounced, mood, genre, sort, freeOnly, offset, limit: PAGE }),
+    (offset: number) => searchMusicLibrary(supabase, { search: debounced, mood, genre, sort, freeOnly, onlyIds, offset, limit: PAGE }),
     // queryKey covers the filter values
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [supabase, queryKey],
@@ -204,6 +212,14 @@ function Library({ pro, onPick }: { pro: boolean; onPick: (t: MusicLibraryTrack)
     setMood('');
     setGenre('');
     setFreeOnly(false);
+    setFavOnly(false);
+  };
+  const favorites = favIds ? { ids: new Set(favIds), toggle: (id: string) => toggleFavorite(id) } : null;
+  const toggleFavorite = (id: string) => {
+    const on = !favIds?.includes(id);
+    const before = favIds;
+    setFavIds((cur) => (cur ? (on ? [id, ...cur] : cur.filter((x) => x !== id)) : cur));
+    setFavoriteTrack(supabase, id, on).catch(() => setFavIds(before));
   };
   const moods = allMoods ? facets.moods : facets.moods.slice(0, MOODS_SHOWN);
   const SELECT = 'min-w-0 flex-1 rounded-lg border border-white/[.12] bg-[#12141b] px-2.5 py-1.5 text-[13px] text-[#f4f5f8]';
@@ -258,6 +274,11 @@ function Library({ pro, onPick }: { pro: boolean; onPick: (t: MusicLibraryTrack)
           <span className="flex-1" aria-live="polite">
             {total === null ? 'Loading…' : `${total} ${total === 1 ? 'track' : 'tracks'}`}
           </span>
+          {favIds && (
+            <button type="button" aria-pressed={favOnly} onClick={() => setFavOnly((v) => !v)} className="rounded-full border border-white/[.12] px-2.5 py-0.5 font-semibold text-[#9aa1af] aria-pressed:border-[#8b7dff]/60 aria-pressed:bg-[#5b4bff]/[.18] aria-pressed:text-[#cfc8ff]">
+              ♥ Favourites{favIds.length ? ` ${favIds.length}` : ''}
+            </button>
+          )}
           {!pro && (
             <button type="button" aria-pressed={freeOnly} onClick={() => setFreeOnly((v) => !v)} className="rounded-full border border-white/[.12] px-2.5 py-0.5 font-semibold text-[#9aa1af] aria-pressed:border-[#8b7dff]/60 aria-pressed:bg-[#5b4bff]/[.18] aria-pressed:text-[#cfc8ff]">
               Free only
@@ -286,7 +307,7 @@ function Library({ pro, onPick }: { pro: boolean; onPick: (t: MusicLibraryTrack)
             <h3 className="mb-1.5 text-[11.5px] font-semibold tracking-wide text-[#767e8d] uppercase">Recently used</h3>
             <div className="grid gap-1.5">
               {recent.map((t) => (
-                <TrackRow key={`r-${t.id}`} track={t} pro={pro} player={player} onPick={onPick} />
+                <TrackRow key={`r-${t.id}`} track={t} pro={pro} player={player} onPick={onPick} favorites={favorites} />
               ))}
             </div>
             <h3 className="mt-3 mb-1.5 text-[11.5px] font-semibold tracking-wide text-[#767e8d] uppercase">All tracks</h3>
@@ -305,11 +326,12 @@ function Library({ pro, onPick }: { pro: boolean; onPick: (t: MusicLibraryTrack)
             ) : (
               'No library tracks yet.'
             )}
+            {favOnly && !favIds?.length && <span className="mt-1 block">Tap ♡ on a track to keep it here.</span>}
           </p>
         )}
         <div className="grid gap-1.5">
           {tracks.map((t) => (
-            <TrackRow key={t.id} track={t} pro={pro} player={player} onPick={onPick} />
+            <TrackRow key={t.id} track={t} pro={pro} player={player} onPick={onPick} favorites={favorites} />
           ))}
         </div>
         <div ref={sentinelRef} className="h-px" />
@@ -351,7 +373,19 @@ function usePreviewPlayer(): PreviewPlayer {
   return { playing, progress, toggle };
 }
 
-function TrackRow({ track: t, pro, player, onPick }: { track: MusicLibraryTrack; pro: boolean; player: PreviewPlayer; onPick: (t: MusicLibraryTrack) => Promise<void> }) {
+function TrackRow({
+  track: t,
+  pro,
+  player,
+  onPick,
+  favorites,
+}: {
+  track: MusicLibraryTrack;
+  pro: boolean;
+  player: PreviewPlayer;
+  onPick: (t: MusicLibraryTrack) => Promise<void>;
+  favorites: { ids: Set<string>; toggle: (id: string) => void } | null;
+}) {
   const inUse = useEditorStore((s) => musicClip(s.project)?.assetId === `library:${t.storagePath}`);
   const [picking, setPicking] = useState(false);
   const locked = t.proOnly && !pro;
@@ -376,6 +410,17 @@ function TrackRow({ track: t, pro, player, onPick }: { track: MusicLibraryTrack;
             {!t.proOnly && !pro ? ' · Free' : ''}
           </div>
         </div>
+        {favorites && (
+          <button
+            type="button"
+            aria-pressed={favorites.ids.has(t.id)}
+            aria-label={favorites.ids.has(t.id) ? `Remove ${t.name} from favourites` : `Add ${t.name} to favourites`}
+            onClick={() => favorites.toggle(t.id)}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[16px] text-[#767e8d] hover:bg-white/[.06] hover:text-[#cfc8ff] aria-pressed:text-[#ff7aa8]"
+          >
+            {favorites.ids.has(t.id) ? '♥' : '♡'}
+          </button>
+        )}
         {locked ? (
           <Link href="/pricing" className="shrink-0 rounded-[10px] border border-[#8b7dff]/40 px-2.5 py-1.5 text-[12px] font-semibold text-[#cfc8ff]" title="Library tracks are a Pro feature">
             🔒 Pro

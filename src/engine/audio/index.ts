@@ -5,6 +5,7 @@ export { scheduleDucking, snapToBeat } from './music';
 export { renderProjectAudio, type MixOptions } from './mix';
 export {
   allAudioClips,
+  beatTimes,
   audibleClips,
   audioTracks,
   clipGainAt,

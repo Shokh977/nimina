@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
+
 import { clipWindow, findClip } from '@/engine/audio/clips';
 import { getTimeline } from '@/engine/render';
 import { useEditorStore } from '@/store/editorStore';
+import { clipBeats, snapDurationsToBeats } from '../audio/beatSnap';
 import RangeInput from '../ui/RangeInput';
 import SectionLabel from '../ui/SectionLabel';
 import ToggleRow from '../ui/ToggleRow';
@@ -27,6 +30,7 @@ export default function AudioPanel({ onClose, embedded = false }: { onClose?: ()
   const removeAudioClip = useEditorStore((s) => s.removeAudioClip);
   const setDucking = useEditorStore((s) => s.setDucking);
   const setMusicDrawerOpen = useEditorStore((s) => s.setMusicDrawerOpen);
+  const setSegmentDurations = useEditorStore((s) => s.setSegmentDurations);
 
   const clip = selection ? findClip(project, selection) : null;
   const close = () => {
@@ -122,6 +126,28 @@ export default function AudioPanel({ onClose, embedded = false }: { onClose?: ()
         <p className="mt-2 text-[12px] leading-snug text-[#767e8d]">On the timeline: drag the music to pick which part of the song plays, drag its edges to trim, and drag the dots on top for fades.</p>
       </div>
 
+      <div>
+        <SectionLabel>Beat</SectionLabel>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-[12.5px] text-[#c9cdd8]">
+            Tempo
+            <BpmInput key={clip.id} bpm={clip.bpm} onChange={(bpm) => set({ bpm })} />
+            BPM
+          </label>
+          <button
+            type="button"
+            disabled={!clip.bpm || !buffer}
+            onClick={() => buffer && clip.bpm && setSegmentDurations(snapDurationsToBeats(project, clipBeats(clip, buffer.duration), 60 / clip.bpm))}
+            className="ml-auto rounded-[10px] border border-white/[.12] bg-white/[.03] px-3 py-1.5 text-[12.5px] font-semibold text-[#c9cdd8] hover:bg-white/[.08] disabled:opacity-40"
+          >
+            Snap slides to beat
+          </button>
+        </div>
+        <p className="mt-2 text-[12px] leading-snug text-[#767e8d]">
+          {clip.bpm ? 'Moves each slide change onto the nearest beat. Slide edges in the timeline snap to beats too (hold Alt to drag freely).' : 'Enter the song’s tempo to see its beats on the timeline and snap slides to them.'}
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 gap-4">
         <RangeInput min={0} max={Math.min(10, Math.max(0, len - clip.fadeOut))} step={0.1} value={Math.min(clip.fadeIn, len)} onChange={(fadeIn) => set({ fadeIn })} label="Fade in" valueLabel={`${clip.fadeIn.toFixed(1)}s`} />
         <RangeInput min={0} max={Math.min(10, Math.max(0, len - clip.fadeIn))} step={0.1} value={Math.min(clip.fadeOut, len)} onChange={(fadeOut) => set({ fadeOut })} label="Fade out" valueLabel={`${clip.fadeOut.toFixed(1)}s`} />
@@ -132,5 +158,29 @@ export default function AudioPanel({ onClose, embedded = false }: { onClose?: ()
         <ToggleRow title="Duck under story sound effects" sub="Briefly lowers the music whenever a story action's SFX plays" checked={project.ducking} onChange={setDucking} />
       </div>
     </div>
+  );
+}
+
+/** Tempo field: keeps what's typed (so "1" → "12" → "120" works) and
+ * applies it only while it's a sensible tempo. */
+function BpmInput({ bpm, onChange }: { bpm: number | undefined; onChange: (bpm: number | undefined) => void }) {
+  const [draft, setDraft] = useState(bpm ? String(bpm) : '');
+  return (
+    <input
+      type="number"
+      min={40}
+      max={240}
+      step={1}
+      value={draft}
+      placeholder="BPM"
+      aria-label="Tempo in beats per minute"
+      onChange={(e) => {
+        setDraft(e.target.value);
+        const v = Math.round(Number(e.target.value));
+        if (e.target.value === '') onChange(undefined);
+        else if (v >= 40 && v <= 240) onChange(v);
+      }}
+      className="w-[72px] rounded-lg border border-white/[.12] bg-white/[.03] px-2 py-1.5 text-[13px] text-[#f4f5f8] tabular-nums"
+    />
   );
 }

@@ -16,11 +16,12 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-  const [profile, projects, subscriptions, purchases] = await Promise.all([
+  const [profile, projects, subscriptions, purchases, musicFavorites] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
     supabase.from('projects').select('*').eq('user_id', user.id).order('created_at'),
     supabase.from('subscriptions').select('*').eq('user_id', user.id),
     supabase.from('purchases').select('*').eq('user_id', user.id),
+    supabase.from('music_favorites').select('track_id, created_at').eq('user_id', user.id),
   ]);
 
   const files = isR2Configured() ? (await r2().list(r2().bucketName('private'), `${user.id}/`)).map((o) => ({ path: o.key, bytes: o.size })) : [];
@@ -41,6 +42,7 @@ export async function GET() {
     subscriptions: subscriptions.data ?? [],
     purchases: purchases.data ?? [],
     projects: projects.data ?? [],
+    musicFavorites: musicFavorites.data ?? [],
     storedFiles: files,
   };
   return new NextResponse(JSON.stringify(body, null, 2), {

@@ -128,6 +128,8 @@ interface EditorState {
   updateAudioClip: (clipId: string, patch: Partial<Omit<AudioClip, 'id'>>) => void;
   removeAudioClip: (clipId: string) => void;
   setDucking: (v: boolean) => void;
+  /** Sets intro/slide/outro durations together, as one undo step (snap to beat). */
+  setSegmentDurations: (d: { intro?: number; outro?: number; scenes: Record<number, number> }) => void;
   /** The audio clip whose settings replace the inspector's tabs (null =
    * the tabs). UI state, not undoable. */
   audioSelection: string | null;
@@ -504,6 +506,13 @@ export const useEditorStore = create<EditorState>((set, get) => {
       if (get().audioSelection === clipId) set({ audioSelection: null });
     },
     setDucking: (ducking) => update((p) => ({ ...p, ducking })),
+    setSegmentDurations: (d) =>
+      update((p) => ({
+        ...p,
+        intro: d.intro !== undefined ? { ...p.intro, dur: d.intro } : p.intro,
+        outro: d.outro !== undefined ? { ...p.outro, dur: d.outro } : p.outro,
+        scenes: p.scenes.map((s) => (d.scenes[s.id] !== undefined ? { ...s, dur: d.scenes[s.id] } : s)),
+      })),
 
     registerImage: (assetId, image) => {
       set((s) => ({ assets: { ...s.assets, images: { ...s.assets.images, [assetId]: image } } }));

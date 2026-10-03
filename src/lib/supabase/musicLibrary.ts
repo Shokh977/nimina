@@ -58,6 +58,8 @@ export interface LibraryQuery {
   mood?: string;
   genre?: string;
   freeOnly?: boolean;
+  /** Only these track ids (the Favourites filter). */
+  onlyIds?: string[];
   sort: LibrarySort;
   offset: number;
   limit: number;
@@ -78,6 +80,7 @@ export async function searchMusicLibrary(supabase: SupabaseClient, q: LibraryQue
   if (q.mood) query = query.eq('mood', q.mood);
   if (q.genre) query = query.eq('genre', q.genre);
   if (q.freeOnly) query = query.eq('pro_only', false);
+  if (q.onlyIds) query = query.in('id', q.onlyIds.length ? q.onlyIds : ['-']);
   if (q.sort === 'newest') query = query.order('created_at', { ascending: false });
   else if (q.sort === 'title') query = query.order('name');
   else if (q.sort === 'bpm') query = query.order('bpm');
@@ -109,6 +112,23 @@ export async function getMusicTracks(supabase: SupabaseClient, ids: string[]): P
   if (error) throw error;
   const byId = new Map((data ?? []).map((r) => [r.id as string, toTrack(r)]));
   return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
+/** The signed-in user's favourite track ids (migration 0023), or null when
+ * favourites aren't available — signed out, or the table isn't there yet. */
+export async function listFavoriteTrackIds(supabase: SupabaseClient): Promise<string[] | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase.from('music_favorites').select('track_id').order('created_at', { ascending: false });
+  if (error) return null;
+  return (data ?? []).map((r) => r.track_id as string);
+}
+
+export async function setFavoriteTrack(supabase: SupabaseClient, trackId: string, on: boolean): Promise<void> {
+  const { error } = on ? await supabase.from('music_favorites').upsert({ track_id: trackId }, { onConflict: 'user_id,track_id', ignoreDuplicates: true }) : await supabase.from('music_favorites').delete().eq('track_id', trackId);
+  if (error) throw error;
 }
 
 export function getMusicLibraryUrl(storagePath: string): string {

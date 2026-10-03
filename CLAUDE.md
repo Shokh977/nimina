@@ -745,7 +745,10 @@ infinite scroll) by `searchMusicLibrary()` in
 `src/lib/supabase/musicLibrary.ts`: search over title/artist/mood/genre
 (ilike), mood chips and genre (most common first, from
 `musicLibraryFacets()`), sort, "Free only" for free users, and a Recently
-used list (last 8 picks, per browser in localStorage). Pro-only tracks are
+used list (last 8 picks, per browser in localStorage), and ♥ favourites
+saved on the account (`music_favorites`, migration 0023 — users read/write
+their own rows under RLS; hidden when signed out or before the migration
+runs). Pro-only tracks are
 greyed with an upgrade prompt for free users, who can still preview. A picked library track becomes
 a clip with assetId `library:<path>` and its decoded buffer, so preview and
 export treat it exactly like an upload. Like the other plan gates this is
@@ -772,6 +775,13 @@ the song plays, edges = trim with snapping to slide boundaries/playhead,
 top dots = fades, Delete removes); selecting it swaps the inspector for
 `AudioPanel.tsx` (the same values as sliders, plus loop, ducking, Replace).
 Store: `audioSelection`, `setMusic`, `updateAudioClip`, `removeAudioClip`.
+
+Beats: a clip with a BPM (library tracks have one; uploads can have it
+typed in the Audio panel) shows its beats on the timeline (`beatTimes()`,
+assuming the file's beat 0 is its first sample; a line per bar). Slide
+edges dragged in the timeline snap to them (Alt = free), and "Snap slides
+to beat" (`components/editor/audio/beatSnap.ts`) moves every slide change
+to the nearest beat in one undo step — story slides keep their length.
 On phones the slide strip has a ♪ chip that opens the panel in the sheet.
 `scripts/seed-music-library.ts` (re)creates the procedural placeholder
 tracks in the same MP3 format.
