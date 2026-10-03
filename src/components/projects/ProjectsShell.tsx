@@ -178,9 +178,7 @@ export default function ProjectsShell({
 
         <div className="mt-7">
           {plan === 'free' && <PlanUsageBanner />}
-          <div className="mb-5 max-w-[360px]">
-            <StorageMeter compact />
-          </div>
+          <StorageMeter compact onlyNearLimit wrapperClassName="mb-5 max-w-[360px]" />
 
           <Toolbar activeTab={activeTab} onTabChange={setActiveTab} counts={counts} search={search} onSearchChange={setSearch} view={view} onViewChange={setViewPersisted} />
 

@@ -2,7 +2,7 @@ import type { FeatureBentoContent } from '@/lib/siteContent';
 
 export default function FeatureBento({ content }: { content: FeatureBentoContent }) {
   return (
-    <section aria-labelledby="features-heading" className="border-t border-white/[.06] bg-[#08090c] py-24">
+    <section id="features" aria-labelledby="features-heading" className="border-t border-white/[.06] bg-[#08090c] py-24">
       <div className="mx-auto max-w-[1180px] px-6">
         <div className="text-center">
           <h2 id="features-heading" className="font-[family-name:var(--font-space-grotesk)] text-[clamp(30px,3.6vw,44px)] leading-[1.08] font-bold tracking-[-.025em] text-[#f4f5f8]">

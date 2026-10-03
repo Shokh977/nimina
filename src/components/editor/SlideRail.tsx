@@ -82,11 +82,8 @@ export default function SlideRail() {
       </div>
 
       <div className="mt-auto pt-3">
-        {projectId && (
-          <div className="mb-3 rounded-xl border border-white/[.07] bg-white/[.03] p-3">
-            <StorageMeter compact />
-          </div>
-        )}
+        {/* Only when storage is nearly full — otherwise it's in the account menu. */}
+        {projectId && <StorageMeter compact onlyNearLimit wrapperClassName="mb-3 rounded-xl border border-white/[.07] bg-white/[.03] p-3" />}
         <div className="rounded-xl border border-white/[.07] bg-white/[.03] p-3 text-[12px] leading-[1.45] text-[#767e8d]">
           Wrap words in <span className="font-[family-name:var(--font-space-grotesk)] text-[#cfc8ff]">*stars*</span> to highlight them.
         </div>

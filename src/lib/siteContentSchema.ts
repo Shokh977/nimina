@@ -66,15 +66,9 @@ export const SITE_CONTENT_SCHEMA: SectionSchema[] = [
       p('text', 'ctaPrimaryHref', 'Primary button link'),
       p('text', 'ctaSecondaryLabel', 'Secondary button label'),
       p('text', 'ctaSecondaryHref', 'Secondary button link'),
-      p('text', 'avatarCaption', 'Caption next to the avatar stack'),
       p('text', 'exportBadgeText', 'Floating "exported" badge text'),
       { kind: 'templateSelect', key: 'featuredTemplateId', label: 'Featured template (plays inside the phone mockup)' },
     ],
-  },
-  {
-    key: 'logos',
-    title: 'Logo marquee',
-    fields: [p('text', 'label', 'Label above the logos'), { kind: 'objectList', key: 'items', label: 'Logos', itemLabel: 'Logo', itemFields: [p('text', 'name', 'Name')] }],
   },
   {
     key: 'template_library',
@@ -99,25 +93,6 @@ export const SITE_CONTENT_SCHEMA: SectionSchema[] = [
       p('text', 'heroTitle', 'Large tile — title'),
       p('textarea', 'heroBody', 'Large tile — body'),
       { kind: 'objectList', key: 'features', label: 'Feature tiles', itemLabel: 'Feature', itemFields: [p('text', 'title', 'Title'), p('textarea', 'body', 'Body')] },
-    ],
-  },
-  {
-    key: 'stats',
-    title: 'Stats band',
-    fields: [{ kind: 'objectList', key: 'items', label: 'Stats', itemLabel: 'Stat', itemFields: [p('text', 'value', 'Value'), p('text', 'label', 'Label')] }],
-  },
-  {
-    key: 'testimonials',
-    title: 'Testimonials',
-    fields: [
-      p('text', 'heading', 'Heading'),
-      {
-        kind: 'objectList',
-        key: 'items',
-        label: 'Testimonials',
-        itemLabel: 'Testimonial',
-        itemFields: [p('textarea', 'quote', 'Quote'), p('text', 'initials', 'Avatar initials'), p('text', 'name', 'Name'), p('text', 'role', 'Role'), p('text', 'avatar', 'Avatar background (CSS gradient)'), p('boolean', 'dark', 'Dark initials text (for light avatar backgrounds)')],
-      },
     ],
   },
   {

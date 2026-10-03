@@ -10,6 +10,9 @@ export default function Header({ signedIn }: { signedIn: boolean }) {
           <span className="font-[family-name:var(--font-space-grotesk)] text-[17px] font-bold text-[#f4f5f8]">Nimina</span>
         </Link>
         <nav aria-label="Primary" className="hidden items-center gap-7 sm:flex">
+          <a href="#features" className="text-[14px] text-[#9aa1af] transition-colors hover:text-[#f4f5f8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]">
+            Features
+          </a>
           <a href="#templates" className="text-[14px] text-[#9aa1af] transition-colors hover:text-[#f4f5f8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]">
             Templates
           </a>

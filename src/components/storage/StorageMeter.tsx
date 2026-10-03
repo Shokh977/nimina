@@ -5,13 +5,29 @@ import { useEffect, useState } from 'react';
 import { cachedUsage, fetchUsage, STORAGE_USAGE_EVENT, UPLOAD_ERROR_EVENT } from '@/lib/storage/assets';
 import { formatBytes, type StorageUsage } from '@/lib/storage/rules';
 
+export const NEAR_LIMIT = 0.8;
+
 /**
  * "1.2 GB of 5 GB used" with a bar. Keeps itself current: it loads the
  * usage on mount and follows every change the storage helpers announce
  * (uploads, deleted/duplicated projects). When storage is full — or an
  * upload was just refused for space — it says what to do about it.
  */
-export default function StorageMeter({ initial, compact = false }: { initial?: StorageUsage | null; compact?: boolean }) {
+export default function StorageMeter({
+  initial,
+  compact = false,
+  onlyNearLimit = false,
+  wrapperClassName = '',
+}: {
+  initial?: StorageUsage | null;
+  compact?: boolean;
+  /** Render nothing until usage reaches NEAR_LIMIT (or an upload was refused) —
+   * for the editor and dashboard, where routine usage isn't worth the space.
+   * The account page and the avatar menu always show it. */
+  onlyNearLimit?: boolean;
+  /** Classes for the outer box (so a hidden meter leaves no empty card). */
+  wrapperClassName?: string;
+}) {
   const [usage, setUsage] = useState<StorageUsage | null>(initial ?? cachedUsage());
   const [refused, setRefused] = useState(false);
 
@@ -37,10 +53,11 @@ export default function StorageMeter({ initial, compact = false }: { initial?: S
   const pct = Math.min(100, (usage.used / usage.limit) * 100);
   const full = usage.used >= usage.limit * 0.98 || refused;
   const high = pct >= 80;
+  if (onlyNearLimit && pct < NEAR_LIMIT * 100 && !full) return null;
   const bar = full ? 'bg-[#ff7a59]' : high ? 'bg-[#ffd166]' : 'bg-[#8b7dff]';
 
   return (
-    <div className={compact ? 'text-[12px]' : 'text-[13px]'}>
+    <div className={`${compact ? 'text-[12px]' : 'text-[13px]'} ${wrapperClassName}`}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-semibold text-[#cfd3dc]">Storage</span>
         <span className="text-[#9aa1af]">

@@ -502,11 +502,7 @@ function MobileSlideList() {
         ))}
         <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={onAddFiles} />
       </div>
-      {projectId && (
-        <div className="mt-2 rounded-xl border border-white/[.07] bg-white/[.03] p-3">
-          <StorageMeter compact />
-        </div>
-      )}
+      {projectId && <StorageMeter compact onlyNearLimit wrapperClassName="mt-2 rounded-xl border border-white/[.07] bg-white/[.03] p-3" />}
       <p className="mt-1 text-[12.5px] leading-snug text-[#767e8d]">
         Wrap words in <span className="text-[#cfc8ff]">*stars*</span> to highlight them.
       </p>

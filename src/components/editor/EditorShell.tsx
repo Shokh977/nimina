@@ -246,6 +246,21 @@ export function EditorShellBody({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [undo, redo]);
 
+  // On a computer Export is the header button (it opens the Export panel in
+  // the inspector); the phone layout keeps it in its tab bar.
+  const deskTabs = tabs.filter((t) => t.id !== 'export');
+  const exportOpen = activeTab === 'export' && audioSelection === null;
+  const lastTabRef = useRef(deskTabs[0]?.id ?? 'scenes');
+  useEffect(() => {
+    if (activeTab !== 'export') lastTabRef.current = activeTab;
+  }, [activeTab]);
+  const selectAudio = useEditorStore((s) => s.selectAudio);
+  const openExport = () => {
+    selectAudio(null);
+    onTabChange('export');
+  };
+  const closeExport = () => onTabChange(lastTabRef.current);
+
   const playbackApi = useMemo(() => ({ seek: engine.seek, playFrom: engine.playFrom }), [engine.seek, engine.playFrom]);
   const phone = useIsPhone();
 
@@ -264,7 +279,7 @@ export function EditorShellBody({
   return (
     <PlaybackProvider value={playbackApi}>
       <div className="flex h-screen max-h-screen flex-col overflow-hidden bg-[#08090c] text-[#f4f5f8]">
-        <Header userEmail={userEmail} projectName={projectName} saveStatus={saveStatus} engine={engine} onExportClick={() => onTabChange('export')} />
+        <Header userEmail={userEmail} projectName={projectName} saveStatus={saveStatus} engine={engine} exportOpen={exportOpen} onExportClick={openExport} />
 
         <div className="flex min-h-0 flex-1">
           {musicDrawerOpen ? (
@@ -295,11 +310,21 @@ export function EditorShellBody({
               </div>
             ) : (
               <>
-                <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/[.07] p-2 pb-0">
-                  {tabs.map((t) => (
-                    <TabButton key={t.id} active={activeTab === t.id} label={t.label} onClick={() => onTabChange(t.id)} />
-                  ))}
-                </div>
+                {exportOpen ? (
+                  // Export lives behind the header's Export button only — not also a tab.
+                  <div className="flex items-center gap-2 border-b border-white/[.07] px-3 py-2.5">
+                    <button type="button" onClick={closeExport} className="rounded-[8px] px-2 py-1 text-[12.5px] font-semibold text-[#9aa1af] hover:bg-white/[.06] hover:text-white" aria-label="Close export">
+                      ← Back
+                    </button>
+                    <h2 className="text-[14px] font-semibold text-[#f4f5f8]">Export</h2>
+                  </div>
+                ) : (
+                  <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/[.07] p-2 pb-0">
+                    {deskTabs.map((t) => (
+                      <TabButton key={t.id} active={activeTab === t.id} label={t.label} onClick={() => onTabChange(t.id)} />
+                    ))}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1 overflow-y-auto p-4">{panel}</div>
               </>
             )}

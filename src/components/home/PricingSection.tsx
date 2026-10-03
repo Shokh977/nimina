@@ -32,7 +32,7 @@ export default function PricingSection({ content }: { content: PricingContent })
                 className={`relative rounded-[20px] border p-[30px] ${highlighted ? 'border-[#8b7dff]/55 shadow-[0_26px_60px_rgba(91,75,255,.18)]' : 'border-white/[.08] bg-[#11131a]'}`}
                 style={highlighted ? { background: 'radial-gradient(120% 120% at 50% 0%, rgba(91,75,255,.2), #11131a 60%)' } : undefined}
               >
-                {highlighted && <span className="absolute -top-3 left-[30px] rounded-full bg-[#5b4bff] px-3 py-1 text-[11px] font-bold tracking-wide text-white uppercase">Most popular</span>}
+                {highlighted && <span className="absolute -top-3 left-[30px] rounded-full bg-[#5b4bff] px-3 py-1 text-[11px] font-bold tracking-wide text-white uppercase">Everything unlocked</span>}
 
                 <h3 className="font-[family-name:var(--font-space-grotesk)] text-[19px] font-semibold text-[#f4f5f8]">{p.name}</h3>
                 <p className="mt-3 font-[family-name:var(--font-space-grotesk)] text-[40px] font-bold text-[#f4f5f8]">

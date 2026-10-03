@@ -83,14 +83,6 @@ export default function Hero({ content, featuredTemplate }: { content: HeroConte
             </a>
           </div>
 
-          <div className="mt-9 flex items-center gap-3.5">
-            <div className="flex">
-              {['linear-gradient(140deg,#5b4bff,#8b7dff)', 'linear-gradient(140deg,#ff7a59,#ffb08f)', 'linear-gradient(140deg,#5ee6b5,#1d8f6c)'].map((g, i) => (
-                <span key={i} className="h-7 w-7 rounded-full ring-2 ring-[#08090c]" style={{ background: g, marginLeft: i === 0 ? 0 : -8 }} />
-              ))}
-            </div>
-            <span className="text-[13.5px] text-[#767e8d]">{content.avatarCaption}</span>
-          </div>
         </div>
 
         <div className="relative mx-auto w-full max-w-[460px]">

@@ -431,6 +431,16 @@ image is a committed static file (`public/brand/og-image.png`, regenerated
 via `npm run generate:brand-assets` — see the Brand section below), not a
 dynamic `next/og` route.
 
+**The homepage (`src/app/page.tsx`) states only what the app really
+does** — it's pre-launch, so no user counts, testimonials, partner logos or
+render stats (those sections were removed). Its copy lives in the
+`site_content` table (admin-editable at /admin/homepage), which overrides
+`DEFAULT_SITE_CONTENT` in `src/lib/siteContent.ts`; after changing the
+defaults, `node --env-file=.env.local scripts/apply-homepage-copy.ts
+--apply` writes them to the table (keeping the featured template, links and
+prices an admin set). The page also emits JSON-LD (SoftwareApplication +
+FAQPage, no ratings) and its FAQ answers stay in the HTML when collapsed.
+
 **`/privacy`, `/terms`, `/refunds` are placeholder text, clearly marked as
 such on the page itself — they must be reviewed (ideally by a lawyer) and
 have every bracketed `[...]` filled in before publishing.** They're grounded

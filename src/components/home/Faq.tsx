@@ -35,11 +35,10 @@ export default function Faq({ content }: { content: FaqContent }) {
                     </span>
                   </button>
                 </h3>
-                {isOpen && (
-                  <div id={panelId} role="region" aria-labelledby={buttonId} className="px-[22px] pb-[19px] text-[15.5px] leading-[1.65] text-[#9aa1af]">
-                    {item.a}
-                  </div>
-                )}
+                {/* Always in the page (hidden when closed), so answers are readable by search engines. */}
+                <div id={panelId} role="region" aria-labelledby={buttonId} hidden={!isOpen} className="px-[22px] pb-[19px] text-[15.5px] leading-[1.65] text-[#9aa1af]">
+                  {item.a}
+                </div>
               </div>
             );
           })}
