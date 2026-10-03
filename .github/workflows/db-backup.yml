@@ -1,0 +1,51 @@
+# Weekly database backup to R2, immediately proven by restoring it into a
+# scratch Postgres and comparing every table's row count (README "Database
+# backups"). A failed run emails the repo owner (GitHub's default for
+# scheduled workflows). Also keeps the Supabase project active.
+name: Database backup
+
+on:
+  schedule:
+    - cron: '17 3 * * 0' # Sundays 03:17 UTC
+  workflow_dispatch: {}
+
+concurrency: db-backup
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      scratch:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+      R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+      R2_BACKUP_BUCKET: ${{ vars.R2_BACKUP_BUCKET || 'nimina-backups' }}
+      SCRATCH_DB_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "PG_BIN=/usr/lib/postgresql/17/bin" >> "$GITHUB_ENV"
+      - name: Install script dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Back up
+        id: backup
+        run: node scripts/backup/backup-db.mjs
+      - name: Prove the backup restores
+        run: node scripts/backup/verify-backup.mjs --date=${{ steps.backup.outputs.date }}

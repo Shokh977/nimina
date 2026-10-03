@@ -9,6 +9,8 @@ import { checkPassword } from '@/lib/auth/password';
 import { createClient } from '@/lib/supabase/client';
 import { Field, INPUT, Notice, PasswordField, postAuth } from '../auth/ui';
 
+import StorageMeter from '@/components/storage/StorageMeter';
+import type { StorageUsage } from '@/lib/storage/rules';
 export interface AccountData {
   email: string;
   newEmailPending: string | null;
@@ -19,6 +21,7 @@ export interface AccountData {
   plan: 'free' | 'pro';
   lifetime: { since: string } | null;
   subscription: { status: string; active: boolean; periodEnd: string | null; endsAt: string | null } | null;
+  storage: StorageUsage | null;
 }
 
 const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '—');
@@ -403,6 +406,11 @@ export default function AccountShell({ data }: { data: AccountData }) {
         <PasswordSection data={data} />
         <ConnectedSection data={data} />
         <PlanSection data={data} />
+        {data.storage && (
+          <Section id="storage" title="Storage" description="Screenshots, icons and music across all your projects. Deleting a project frees its space right away.">
+            <StorageMeter initial={data.storage} />
+          </Section>
+        )}
         <SessionsSection />
         <Section id="data" title="Your data" description="Download everything we store about you: account details, plan and billing records, every project, and a list of your uploaded files.">
           <a href="/api/account/export" className={BTN_GHOST}>

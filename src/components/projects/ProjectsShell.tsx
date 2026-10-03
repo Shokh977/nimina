@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Plan } from '@/lib/plan';
 import { instrumentSans, spaceGrotesk } from '@/lib/fonts';
 import { createClient } from '@/lib/supabase/client';
+import StorageMeter from '@/components/storage/StorageMeter';
 import { createProject, deleteProject, duplicateProject, getProject } from '@/lib/supabase/projects';
 import type { MarketingTemplateCard } from '@/lib/supabase/templates';
 import DashboardFooter from './DashboardFooter';
@@ -54,6 +55,7 @@ export default function ProjectsShell({
   const [deleteTarget, setDeleteTarget] = useState<DashboardProject | null>(null);
   const [creating, setCreating] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => {
     const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
@@ -107,6 +109,7 @@ export default function ProjectsShell({
   };
 
   const handleDuplicate = async (id: string) => {
+    setActionError('');
     try {
       const supabase = createClient();
       const source = await getProject(supabase, id);
@@ -114,6 +117,7 @@ export default function ProjectsShell({
       router.refresh();
     } catch (err) {
       console.error('[projects] duplicate failed', err);
+      setActionError(err instanceof Error ? err.message : "Couldn't duplicate that project.");
     }
   };
 
@@ -170,8 +174,13 @@ export default function ProjectsShell({
           </p>
         )}
 
+        {actionError && <p className="mt-3 text-[13.5px] font-semibold text-[#ff8f76]">{actionError}</p>}
+
         <div className="mt-7">
           {plan === 'free' && <PlanUsageBanner />}
+          <div className="mb-5 max-w-[360px]">
+            <StorageMeter compact />
+          </div>
 
           <Toolbar activeTab={activeTab} onTabChange={setActiveTab} counts={counts} search={search} onSearchChange={setSearch} view={view} onViewChange={setViewPersisted} />
 

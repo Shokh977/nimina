@@ -96,7 +96,13 @@ export async function duplicateProject(supabase: SupabaseClient, source: Project
   if (error) throw error;
   const copy = data as ProjectRow;
 
-  await duplicateProjectAssets(source.id, copy.id).catch((err) => console.error('[projects] copying files failed', err));
+  try {
+    await duplicateProjectAssets(source.id, copy.id);
+  } catch (err) {
+    // A copy without its files would be a broken project — undo it.
+    await supabase.from('projects').delete().eq('id', copy.id);
+    throw err;
+  }
   return copy;
 }
 

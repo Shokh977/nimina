@@ -13,6 +13,10 @@ export const PRO_ONLY_EFFECTS: Effect[] = ['confetti', 'sparkles'];
 
 export const PLAN_LIMITS = {
   free: {
+    // Stored files (screenshots, icons, music, thumbnails) across all
+    // projects, enforced server-side in /api/storage/upload via
+    // public.reserve_storage (supabase/migrations/0019_storage_quota.sql).
+    maxStorageBytes: 200 * 1024 * 1024,
     maxProjects: 1,
     maxExportResolution: '720p' as const,
     watermark: true,
@@ -36,6 +40,7 @@ export const PLAN_LIMITS = {
     maxTranslateUsesPerMonth: 0,
   },
   pro: {
+    maxStorageBytes: 5 * 1024 * 1024 * 1024,
     maxProjects: Infinity,
     maxExportResolution: '4k' as const,
     watermark: false,
@@ -48,6 +53,7 @@ export const PLAN_LIMITS = {
 } satisfies Record<
   Plan,
   {
+    maxStorageBytes: number;
     maxProjects: number;
     maxExportResolution: '720p' | '1080p' | '4k';
     watermark: boolean;

@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { isR2Configured, projectKey, r2 } from '@/lib/r2/server';
-import { checkUpload, SAFE_SEGMENT } from '@/lib/storage/rules';
+import { checkUpload, quotaMessage, SAFE_SEGMENT } from '@/lib/storage/rules';
+import { recount, reserve } from '@/lib/storage/usage';
 import { createClient } from '@/lib/supabase/server';
 
 const Body = z.object({
@@ -20,8 +21,11 @@ const PREVIEW_NAME = /^preview-(9x16|16x9)\.(mp4|webm)$/;
  * file's type and exact size are checked here against UPLOAD_RULES and
  * signed into the URL, so R2 rejects anything else; the key is always
  * built from the signed-in user's id, so nobody can write outside their
- * own {user_id}/ folder. Template preview videos (admins only) go to the
- * public bucket instead.
+ * own {user_id}/ folder. It also counts against the user's storage limit
+ * (Free 200 MB / Pro 5 GB): the file is reserved atomically before the URL
+ * is issued, and if that would pass the limit, unused files are cleaned up
+ * and the user's usage recounted before refusing. Template preview videos
+ * (admins only) go to the public bucket and don't count.
  */
 export async function POST(request: Request) {
   if (!isR2Configured()) return NextResponse.json({ error: "File storage isn't set up on this server." }, { status: 503 });
@@ -52,6 +56,12 @@ export async function POST(request: Request) {
   const name = kind === 'thumbnail' ? 'thumbnail.jpg' : assetId;
   if (!name) return NextResponse.json({ error: 'Missing asset id.' }, { status: 400 });
   const key = projectKey(user.id, projectId, name);
+  let reservation = await reserve(user.id, [{ key, bytes: size }]);
+  if (!reservation.ok) {
+    await recount(user.id);
+    reservation = await reserve(user.id, [{ key, bytes: size }]);
+  }
+  if (!reservation.ok) return NextResponse.json({ error: quotaMessage(reservation.usage), code: 'quota', usage: reservation.usage }, { status: 413 });
   const signed = await store.signPut(store.bucketName('private'), key, contentType, size);
-  return NextResponse.json({ ...signed, path: key });
+  return NextResponse.json({ ...signed, path: key, usage: reservation.usage });
 }

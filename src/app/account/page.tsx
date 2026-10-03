@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import AccountShell, { type AccountData } from '@/components/account/AccountShell';
 import { instrumentSans, spaceGrotesk } from '@/lib/fonts';
 import { subscriptionGrantsAccess } from '@/lib/paddle/access';
+import { isR2Configured } from '@/lib/r2/server';
+import { recount } from '@/lib/storage/usage';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = { title: 'Account settings', robots: { index: false } };
@@ -21,6 +23,8 @@ export default async function AccountPage() {
     supabase.from('purchases').select('purchased_at').eq('user_id', user.id).limit(1).maybeSingle(),
   ]);
   const sub = subs?.[0] ?? null;
+  // Recount on view, so the figure is exact (and unused files are cleaned up).
+  const storage = isR2Configured() ? await recount(user.id).catch((err) => (console.error('[account] storage recount failed', err), null)) : null;
 
   const data: AccountData = {
     email: user.email ?? '',
@@ -39,6 +43,7 @@ export default async function AccountPage() {
           endsAt: sub.scheduled_change_action === 'cancel' ? sub.scheduled_change_at : null,
         }
       : null,
+    storage,
   };
 
   return (

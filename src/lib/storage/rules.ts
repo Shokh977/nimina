@@ -4,6 +4,14 @@
  * approves are baked into the signed upload URL).
  */
 
+import type { Plan } from '@/lib/plan';
+
+export interface StorageUsage {
+  used: number;
+  limit: number;
+  plan: Plan;
+}
+
 export type UploadKind = 'image' | 'audio' | 'thumbnail' | 'template-preview';
 
 export const UPLOAD_RULES: Record<UploadKind, { maxBytes: number; types: string[]; label: string }> = {
@@ -27,4 +35,15 @@ export function checkUpload(kind: UploadKind, contentType: string, size: number)
   if (size <= 0) return 'That file is empty.';
   if (size > rule.maxBytes) return `That file is too large. ${rule.label}.`;
   return null;
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(bytes % 1024 ** 3 === 0 ? 0 : 1)} GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(bytes >= 100 * 1024 ** 2 || bytes % 1024 ** 2 === 0 ? 0 : 1)} MB`;
+  return `${Math.max(0, Math.round(bytes / 1024))} KB`;
+}
+
+/** What to tell someone who is out of space. */
+export function quotaMessage(usage: StorageUsage): string {
+  return `You've used ${formatBytes(usage.used)} of your ${formatBytes(usage.limit)} of storage. Delete a project you no longer need to free space${usage.plan === 'free' ? ', or upgrade to Pro for 5 GB' : ''}.`;
 }

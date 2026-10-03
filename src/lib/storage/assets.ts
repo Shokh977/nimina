@@ -1,7 +1,7 @@
 import { loadImageFromUrl } from '@/lib/assetSrc';
 import { collectImageAssetIds } from '@/engine/project';
 import type { AssetMap, Project } from '@/engine/types';
-import { checkUpload, type UploadKind } from './rules';
+import { checkUpload, quotaMessage, type StorageUsage, type UploadKind } from './rules';
 
 /**
  * Browser side of file storage (Cloudflare R2). The browser never holds
@@ -14,11 +14,43 @@ import { checkUpload, type UploadKind } from './rules';
  */
 
 export const UPLOAD_ERROR_EVENT = 'nimina:upload-error';
+/** Fired (detail: StorageUsage) whenever the user's storage usage is known to have changed. */
+export const STORAGE_USAGE_EVENT = 'nimina:storage-usage';
+
+export class StorageError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+let usageCache: StorageUsage | null = null;
+
+function setUsage(usage: StorageUsage | undefined) {
+  if (!usage) return;
+  usageCache = usage;
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(STORAGE_USAGE_EVENT, { detail: usage }));
+}
+
+export function cachedUsage(): StorageUsage | null {
+  return usageCache;
+}
+
+/** Loads the user's usage (`recount` re-syncs with what's really stored first). */
+export async function fetchUsage(recount = false): Promise<StorageUsage | null> {
+  const res = await fetch(`/api/storage/usage${recount ? '?recount=1' : ''}`, { cache: 'no-store' });
+  if (!res.ok) return null;
+  const usage = (await res.json()) as StorageUsage;
+  setUsage(usage);
+  return usage;
+}
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `Request failed (${res.status})`);
+  const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string; usage?: StorageUsage };
+  setUsage(data.usage);
+  if (!res.ok) throw new StorageError(data.error ?? `Request failed (${res.status})`, data.code);
   return data as T;
 }
 
@@ -35,11 +67,13 @@ async function signedUpload(kind: UploadKind, projectId: string, assetId: string
 /** Checks a picked file against the upload rules BEFORE it's added to the
  * project — a refused file must never become a slide whose image then
  * can't load after a reload. Announces the reason (SaveStatusBadge) and
- * returns true when the file should be skipped. Only applies when the
+ * returns true when the file should be skipped. Also refuses a file that
+ * would go over the storage limit (from the last known usage — the server
+ * still enforces it either way). Only applies when the
  * project is saved (projectId set); unsaved editor sessions keep files local. */
 export function rejectUpload(file: File, projectId: string | null | undefined, kind: 'image' | 'audio' = 'image'): boolean {
   if (!projectId) return false;
-  const problem = checkUpload(kind, file.type, file.size);
+  const problem = checkUpload(kind, file.type, file.size) ?? (usageCache && usageCache.used + file.size > usageCache.limit ? quotaMessage(usageCache) : null);
   if (!problem) return false;
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(UPLOAD_ERROR_EVENT, { detail: problem }));
   return true;

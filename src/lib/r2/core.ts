@@ -22,6 +22,7 @@ export interface R2Config {
 export interface R2Object {
   key: string;
   size: number;
+  lastModified: Date;
 }
 
 export class R2 {
@@ -111,7 +112,8 @@ export class R2 {
       for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
         const key = decodeXml(m[1].match(/<Key>([\s\S]*?)<\/Key>/)?.[1] ?? '');
         const size = Number(m[1].match(/<Size>(\d+)<\/Size>/)?.[1] ?? 0);
-        if (key) out.push({ key, size });
+        const lastModified = new Date(m[1].match(/<LastModified>([\s\S]*?)<\/LastModified>/)?.[1] ?? 0);
+        if (key) out.push({ key, size, lastModified });
       }
       token = /<IsTruncated>true<\/IsTruncated>/.test(xml) ? decodeXml(xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/)?.[1] ?? '') || null : null;
     } while (token);

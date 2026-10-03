@@ -623,6 +623,30 @@ Background upload failures show in the editor's save badge.
 `scripts/migrate-storage-to-r2.mjs` copied the old Supabase Storage files
 (dry run by default, `--apply`, `--verify`; never deletes from Supabase).
 
+### Storage limits
+
+Free 200 MB, Pro 5 GB (`maxStorageBytes`, `src/lib/plan.ts`), enforced in
+`/api/storage/upload` and `/api/storage/project` (duplicate) through
+`public.reserve_storage` (migration 0019): every private file is recorded
+in `public.storage_objects` when its upload is approved, atomically under a
+per-user lock. Deleting a project deletes its rows (space freed at once).
+`recount()` (`src/lib/storage/usage.ts`) re-syncs rows with R2 and deletes
+files no project references any more (older than an hour; "referenced" =
+the file name appears anywhere in the project's saved JSON, so a new kind
+of asset reference can't get a live file deleted). It runs on /account
+views and before refusing an upload. `StorageMeter` shows usage in the
+editor rail, /projects and /account; the browser also pre-checks against
+the last known usage so a file that won't fit never becomes a slide.
+
+### Custom domain for the public bucket
+
+Requires the domain's DNS to be on Cloudflare (R2 custom domains only work
+on Cloudflare-managed zones). Bucket → Settings → Custom Domains → Connect
+→ e.g. `media.<domain>`; Cloudflare creates the DNS record. Then set
+`NEXT_PUBLIC_R2_PUBLIC_URL` to `https://media.<domain>` (Vercel + .env.local),
+redeploy, run `node --env-file=.env.local scripts/repoint-public-url.mjs
+--apply`, and disable the r2.dev URL.
+
 ### R2 setup (Cloudflare dashboard)
 
 1. Create buckets `nimina-private` and `nimina-public`.
@@ -636,6 +660,14 @@ Background upload failures show in the editor's save badge.
 4. R2 → Manage API tokens → Create: "Object Read & Write", limited to the
    two buckets → `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`; the account
    id is `R2_ACCOUNT_ID`. Same six vars in `.env.local` and on the host.
+
+## Operations
+
+Backups (weekly pg_dump to R2, proven by an automatic restore), the
+restore procedure and the Supabase keep-alive cron are documented in
+[README.md](README.md). Backups run in GitHub Actions
+(`.github/workflows/db-backup.yml`, `scripts/backup/`); the keep-alive is a
+Vercel Cron (`vercel.json`, `/api/cron/keepalive`, needs `CRON_SECRET`).
 
 ## Brand
 
