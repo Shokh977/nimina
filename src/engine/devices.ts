@@ -176,15 +176,14 @@ export function drawDevice(
 
   ctx.fillStyle = '#000';
   if (m.cut === 'island') {
-    // Deliberate deviation from legacy/promo-studio.html (confirmed
-    // byte-identical there: `sb.y + PW*0.035`, height `PW*0.085`) — that
-    // positioning put the pill's bottom edge ~0.12*PW below the screen
-    // top, well past the status bar and into real screenshot content
-    // (covering 1-2 lines of a real header, confirmed visually against
-    // captured live screenshots). Pulled up to sit near sb.y like
-    // notch/punch already do, and shortened so its extent (~0.07*PW below
-    // sb.y) matches theirs instead of overlapping app content.
-    rr(ctx, -PW * 0.15, sb.y + PW * 0.005, PW * 0.3, PW * 0.065, PW * 0.0325);
+    // The real Dynamic Island (iPhone 14 Pro–16 Pro): 126 × 37.33 pt, 11 pt
+    // below the top of a 393 pt-wide screen, centred — so it lines up with
+    // the status bar's time/battery row and ends above the 54 pt status bar
+    // (content starts at the 59 pt safe area), i.e. it covers nothing in a
+    // real iPhone screenshot. Sized from the screen box, which matches the
+    // real screen's share of the phone's width (65.1 / 70.6 mm).
+    const k = sb.w / 393;
+    rr(ctx, -63 * k, sb.y + 11 * k, 126 * k, 37.33 * k, 18.67 * k);
     ctx.fill();
   } else if (m.cut === 'notch') {
     const nw = PW * 0.5,
@@ -432,13 +431,10 @@ export function drawDevice3D(ctx: CanvasRenderingContext2D, img: ImageAsset | nu
     ctx.fillText(slug(appName) + '.app', namePt.x, namePt.y);
     ctx.restore();
   } else if (m.cut === 'island') {
-    // Sits a bit lower than the classic 2D renderer's own island position
-    // (sb.y + PW*0.038) — 3D-pose-only per explicit user feedback, so it
-    // reads as level with a status bar's time/signal/battery row instead
-    // of floating right at the screen's top edge. Classic drawDevice()
-    // above is intentionally untouched (see its own "deliberate deviation"
-    // comment on why it's tuned where it is).
-    const pts = roundRectPoints3d(PW * 0.3, PW * 0.065, PW * 0.0325, hz + 1).map((p) => xform3d({ x: p.x, y: p.y + sb.y + PW * 0.058, z: p.z }, pose));
+    // Real Dynamic Island geometry, same as drawDevice() above (126 × 37.33
+    // pt, 11 pt from the top of a 393 pt-wide screen; this ring is centred).
+    const k = sb.w / 393;
+    const pts = roundRectPoints3d(126 * k, 37.33 * k, 18.67 * k, hz + 1).map((p) => xform3d({ x: p.x, y: p.y + sb.y + (11 + 37.33 / 2) * k, z: p.z }, pose));
     ctx.fillStyle = '#000';
     pathFrom3d(ctx, pts);
     ctx.fill();
