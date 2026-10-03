@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import type { Plan } from '@/lib/plan';
 import { PLAN_LIMITS } from '@/lib/plan';
 import { isAiDirectorConfigured } from '@/lib/ai/config';
+import { shrinkForAi } from '@/lib/ai/image';
 import { runDirector, type DirectorImage } from '@/lib/ai/director';
 import { DirectorRequestSchema } from '@/lib/ai/schema';
 import { logEvent } from '@/lib/events';
@@ -63,10 +64,7 @@ export async function POST(request: Request) {
         const store = r2();
         const res = await store.get(store.bucketName('private'), projectKey(user.id, projectId, assetId));
         if (!res.ok) throw new Error(`Couldn't fetch screenshot ${assetId}`);
-        const contentType = res.headers.get('content-type') ?? '';
-        const mediaType = contentType.includes('png') ? 'image/png' : contentType.includes('webp') ? 'image/webp' : contentType.includes('gif') ? 'image/gif' : 'image/jpeg';
-        const buffer = Buffer.from(await res.arrayBuffer());
-        return { sceneId, base64: buffer.toString('base64'), mediaType };
+        return { sceneId, ...(await shrinkForAi(Buffer.from(await res.arrayBuffer()))) };
       }),
     );
   } catch (err) {

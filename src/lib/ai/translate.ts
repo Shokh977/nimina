@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 import { LOCALES, localeDef } from '@/engine/locales';
 
-const MODEL = 'claude-opus-5-5';
+// Short marketing lines don't need the largest model; every translation is
+// reviewed by the user before it's applied.
+const MODEL = 'claude-sonnet-5-5';
 const MAX_TOKENS = 16000;
 const MAX_STRINGS = 300;
 const MAX_STRING_LENGTH = 600;
@@ -85,7 +87,7 @@ export async function runTranslate(apiKey: string, req: TranslateRequest): Promi
     // the same request on the fallback model routed by refusal category.
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
-    output_config: { effort: 'medium', format: betaZodOutputFormat(TranslationOutput) },
+    output_config: { effort: 'low', format: betaZodOutputFormat(TranslationOutput) },
     system: SYSTEM_PROMPT,
     messages: [
       {

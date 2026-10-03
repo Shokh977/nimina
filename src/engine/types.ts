@@ -328,6 +328,10 @@ export interface ImageSlide extends SlideBase {
   kind: 'image';
   /** key into the AssetMap passed to render(); null if no image assigned yet */
   imgAssetId: string | null;
+  /** Elements "Detect elements" found on this screenshot (AI), remembered
+   * so asking again for the same screenshot is free. Not drawn — only the
+   * Cutouts editor reads it; ignored once the screenshot is replaced. */
+  detected?: { assetId: string; elements: Array<{ label: string; rect: { x: number; y: number; w: number; h: number } }> };
 }
 
 /** A moment in a screen recording where the user tapped — marked by
