@@ -9,6 +9,8 @@ import type { TemplateData } from '@/lib/supabase/templates';
 import { useEditorStore } from '@/store/editorStore';
 import TemplatePanel from '../admin/TemplatePanel';
 import Header from './Header';
+import MobileEditor from './mobile/MobileEditor';
+import { useIsPhone } from './mobile/useIsPhone';
 import { PlaybackProvider } from './PlaybackContext';
 import ResizeHandle from './ResizeHandle';
 import SlideRail from './SlideRail';
@@ -27,12 +29,20 @@ import SlidesPanel from './panels/SlidesPanel';
 // the editor's initial bundle for projects that never use it.
 const LanguagesPanel = dynamic(() => import('./panels/LanguagesPanel'));
 
+/** `secondary` tabs are reached from the header's menu on phones (the
+ * mobile tab bar holds Slides, Slide, Look, Motion, Export). */
+export interface EditorTab {
+  id: string;
+  label: string;
+  secondary?: boolean;
+}
+
 const PROJECT_TABS = [
   { id: 'scenes', label: 'Slide' },
   { id: 'look', label: 'Look' },
   { id: 'motion', label: 'Motion' },
-  { id: 'ai', label: 'AI Director' },
-  { id: 'languages', label: 'Languages' },
+  { id: 'ai', label: 'AI Director', secondary: true },
+  { id: 'languages', label: 'Languages', secondary: true },
   { id: 'export', label: 'Export' },
 ] as const;
 const TEMPLATE_TABS = [
@@ -40,7 +50,7 @@ const TEMPLATE_TABS = [
   { id: 'look', label: 'Look' },
   { id: 'motion', label: 'Motion' },
   { id: 'export', label: 'Export' },
-  { id: 'template', label: 'Template' },
+  { id: 'template', label: 'Template', secondary: true },
 ] as const;
 type ProjectTabId = (typeof PROJECT_TABS)[number]['id'];
 type TemplateTabId = (typeof TEMPLATE_TABS)[number]['id'];
@@ -64,21 +74,24 @@ export default function EditorShell({ userEmail, projectId, projectName, initial
   }, [plan, setPlan]);
 
   return (
-    <EditorShellBody userEmail={userEmail} projectName={projectName} saveStatus={saveStatus} onExportClick={() => setTab('export')}>
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/[.07] p-2 pb-0">
-        {PROJECT_TABS.map((t) => (
-          <TabButton key={t.id} active={tab === t.id} label={t.label} onClick={() => setTab(t.id)} />
-        ))}
-      </div>
-      <div className="min-w-0 flex-1 overflow-y-auto p-4">
-        {tab === 'scenes' && <SlidesPanel />}
-        {tab === 'look' && <LookPanel />}
-        {tab === 'motion' && <MotionPanel />}
-        {tab === 'ai' && <AiDirectorPanel />}
-        {tab === 'languages' && <LanguagesPanel />}
-        {tab === 'export' && <ExportPanel />}
-      </div>
-    </EditorShellBody>
+    <EditorShellBody
+      userEmail={userEmail}
+      projectName={projectName}
+      saveStatus={saveStatus}
+      tabs={PROJECT_TABS}
+      activeTab={tab}
+      onTabChange={(id) => setTab(id as ProjectTabId)}
+      panel={
+        <>
+          {tab === 'scenes' && <SlidesPanel />}
+          {tab === 'look' && <LookPanel />}
+          {tab === 'motion' && <MotionPanel />}
+          {tab === 'ai' && <AiDirectorPanel />}
+          {tab === 'languages' && <LanguagesPanel />}
+          {tab === 'export' && <ExportPanel />}
+        </>
+      }
+    />
   );
 }
 
@@ -112,20 +125,23 @@ export function TemplateEditorShell({
   }, [setPlan]);
 
   return (
-    <EditorShellBody userEmail={userEmail} projectName={templateName} saveStatus={saveStatus} onExportClick={() => setTab('export')}>
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/[.07] p-2 pb-0">
-        {TEMPLATE_TABS.map((t) => (
-          <TabButton key={t.id} active={tab === t.id} label={t.label} onClick={() => setTab(t.id)} />
-        ))}
-      </div>
-      <div className="min-w-0 flex-1 overflow-y-auto p-4">
-        {tab === 'scenes' && <SlidesPanel />}
-        {tab === 'look' && <LookPanel />}
-        {tab === 'motion' && <MotionPanel />}
-        {tab === 'export' && <ExportPanel />}
-        {tab === 'template' && <TemplatePanel templateId={templateId} sampleAssetsSourceId={sampleAssetsSourceId} />}
-      </div>
-    </EditorShellBody>
+    <EditorShellBody
+      userEmail={userEmail}
+      projectName={templateName}
+      saveStatus={saveStatus}
+      tabs={TEMPLATE_TABS}
+      activeTab={tab}
+      onTabChange={(id) => setTab(id as TemplateTabId)}
+      panel={
+        <>
+          {tab === 'scenes' && <SlidesPanel />}
+          {tab === 'look' && <LookPanel />}
+          {tab === 'motion' && <MotionPanel />}
+          {tab === 'export' && <ExportPanel />}
+          {tab === 'template' && <TemplatePanel templateId={templateId} sampleAssetsSourceId={sampleAssetsSourceId} />}
+        </>
+      }
+    />
   );
 }
 
@@ -142,25 +158,32 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
   );
 }
 
-/** The fixed-height app shell: header (auto height) over a flex-1 row of
- * three columns (rail / stage+transport / inspector). Each column scrolls
- * inside itself — the page itself never scrolls. Shared by both modes
- * above; everything about *which* tabs/panels render is passed as
- * children, everything about the shell's own geometry lives here once.
+/** The fixed-height app shell. On a computer: header (auto height) over a
+ * flex-1 row of three columns (rail / stage+transport / inspector), each
+ * scrolling inside itself — the page itself never scrolls. On a phone
+ * (src/lib/device.ts PHONE_QUERY) it's a different layout altogether —
+ * MobileEditor: canvas on top, slide strip, tab bar, bottom sheet. Shared by
+ * both modes above; which tabs/panels exist is passed in, the geometry
+ * lives here once.
  * Exported for dev harnesses that need the real shell without a saved
  * project behind it (src/app/dev/engine/localization). */
 export function EditorShellBody({
   userEmail,
   projectName,
   saveStatus,
-  onExportClick,
-  children,
+  tabs,
+  activeTab,
+  onTabChange,
+  panel,
 }: {
   userEmail: string;
   projectName: string;
   saveStatus: SaveStatus;
-  onExportClick: () => void;
-  children: React.ReactNode;
+  tabs: readonly EditorTab[];
+  activeTab: string;
+  onTabChange: (id: string) => void;
+  /** The active tab's panel. */
+  panel: React.ReactNode;
 }) {
   const engine = usePlaybackEngine();
   const undo = useEditorStore((s) => s.undo);
@@ -219,11 +242,24 @@ export function EditorShellBody({
   }, [undo, redo]);
 
   const playbackApi = useMemo(() => ({ seek: engine.seek, playFrom: engine.playFrom }), [engine.seek, engine.playFrom]);
+  const phone = useIsPhone();
+
+  // Until the first client render we can't know which layout fits; render
+  // the empty dark shell for that one frame rather than the wrong layout.
+  if (phone === null) return <div className="h-screen bg-[#08090c]" />;
+
+  if (phone) {
+    return (
+      <PlaybackProvider value={playbackApi}>
+        <MobileEditor userEmail={userEmail} projectName={projectName} saveStatus={saveStatus} engine={engine} tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} panel={panel} />
+      </PlaybackProvider>
+    );
+  }
 
   return (
     <PlaybackProvider value={playbackApi}>
       <div className="flex h-screen max-h-screen flex-col overflow-hidden bg-[#08090c] text-[#f4f5f8]">
-        <Header userEmail={userEmail} projectName={projectName} saveStatus={saveStatus} engine={engine} onExportClick={onExportClick} />
+        <Header userEmail={userEmail} projectName={projectName} saveStatus={saveStatus} engine={engine} onExportClick={() => onTabChange('export')} />
 
         <div className="flex min-h-0 flex-1">
           <aside className="min-h-0 min-w-0 shrink-0 overflow-y-auto [scrollbar-gutter:stable]" style={{ width: railWidth }}>
@@ -240,7 +276,12 @@ export function EditorShellBody({
           <ResizeHandle label="Resize the inspector" onDragStart={onInspectorDragStart} onDrag={onInspectorDrag} />
 
           <section className="flex min-h-0 min-w-0 shrink-0 flex-col" style={{ width: inspectorWidth }}>
-            {children}
+            <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/[.07] p-2 pb-0">
+              {tabs.map((t) => (
+                <TabButton key={t.id} active={activeTab === t.id} label={t.label} onClick={() => onTabChange(t.id)} />
+              ))}
+            </div>
+            <div className="min-w-0 flex-1 overflow-y-auto p-4">{panel}</div>
           </section>
         </div>
       </div>

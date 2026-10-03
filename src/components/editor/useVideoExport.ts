@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { exportVideo, type ExportOutcome, type ExportResolution } from '@/engine/export';
 import { localizeProject } from '@/engine/localization';
 import type { Format } from '@/engine/types';
+import { deviceExportCap } from '@/lib/device';
 import { logEvent } from '@/lib/events';
 import { isPro, PLAN_LIMITS } from '@/lib/plan';
 import { createClient } from '@/lib/supabase/client';
@@ -46,7 +47,8 @@ export function useVideoExport() {
     // security boundary, but it does mean a free user can never actually
     // get a higher-than-720p file out of this code path regardless of how
     // the request got here.
-    const maxResolution = PLAN_LIMITS[plan].maxExportResolution;
+    // ...and on a phone, never above 720p (src/lib/device.ts).
+    const maxResolution = deviceExportCap(PLAN_LIMITS[plan].maxExportResolution);
     const resolution = RESOLUTION_RANK[requestedResolution] > RESOLUTION_RANK[maxResolution] ? maxResolution : requestedResolution;
 
     const controller = new AbortController();

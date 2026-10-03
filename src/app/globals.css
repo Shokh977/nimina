@@ -67,3 +67,34 @@ body {
     transform: translateX(-50%);
   }
 }
+
+/* Phone editor (src/components/editor/mobile/MobileEditor.tsx sets
+   data-touch-ui): every control the inspector panels render — built for a
+   mouse — gets a 44px touch target (in the base layer, so a component's own
+   sizing utilities can still make something bigger), and form fields get
+   16px text so iOS Safari doesn't zoom the page when one is focused (not
+   layered, so it beats the panels' smaller text utilities). The canvas's
+   tap-to-edit text overlays (data-touch-exempt) keep their measured size. */
+@layer base {
+  [data-touch-ui] :where(button, select, a[href], [role="tab"], [role="radio"], input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])):not([data-touch-exempt] *) {
+    min-height: 44px;
+  }
+  [data-touch-ui] :where(button, [role="tab"], [role="radio"]):not([data-touch-exempt] *) {
+    min-width: 44px;
+  }
+  [data-touch-ui] :where(input[type="checkbox"], input[type="radio"]) {
+    width: 22px;
+    height: 22px;
+  }
+  [data-touch-ui] :where(input[type="range"]) {
+    min-height: 36px;
+  }
+  /* Links inside running text: taller hit area without changing the line
+     layout (vertical padding on an inline box doesn't move lines). */
+  [data-touch-ui] :where(p, li, span) > a[href] {
+    padding-block: 14px;
+  }
+}
+[data-touch-ui] :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]), select, textarea):not([data-touch-exempt] *) {
+  font-size: 16px;
+}

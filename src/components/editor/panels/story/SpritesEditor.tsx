@@ -84,7 +84,7 @@ function SpriteRow({ slide, sprite, onRemove }: { slide: StorySlide; sprite: Spr
  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onUpload} />
  </div>
 
- <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+ <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
  <label className="text-[11.5px] font-semibold text-[#767e8d] ">
  Size
  <input
@@ -111,8 +111,8 @@ function SpriteRow({ slide, sprite, onRemove }: { slide: StorySlide; sprite: Spr
  ))}
  </select>
  </label>
- <label className="flex items-center gap-1.5 text-[12px] font-semibold sm:mt-4.5">
- <input type="checkbox" checked={sprite.rotateAlongPath} onChange={(e) => updateSprite(slide.id, sprite.id, { rotateAlongPath: e.target.checked })} className="h-[15px] w-[15px] accent-indigo-600" />
+ <label className="flex min-h-11 items-center gap-2 text-[12px] font-semibold md:mt-4.5 md:min-h-0 md:gap-1.5">
+ <input type="checkbox" checked={sprite.rotateAlongPath} onChange={(e) => updateSprite(slide.id, sprite.id, { rotateAlongPath: e.target.checked })} className="h-[22px] w-[22px] shrink-0 accent-indigo-600 md:h-[15px] md:w-[15px]" />
  Face travel direction
  </label>
  </div>

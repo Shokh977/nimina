@@ -22,8 +22,8 @@ export default function CameraEditor({ slide }: { slide: StorySlide }) {
  <h4 className="mb-1.5 text-[12.5px] font-bold text-[#767e8d] ">Camera</h4>
  <div className="flex gap-3">
  {(['auto', 'manual'] as const).map((mode) => (
- <label key={mode} className="flex items-center gap-1.5 text-[13px] font-semibold">
- <input type="radio" name={`camera-mode-${slide.id}`} checked={slide.cameraMode === mode} onChange={() => setCameraMode(slide.id, mode)} className="h-[16px] w-[16px] accent-indigo-600" />
+ <label key={mode} className="flex min-h-11 items-center gap-2 text-[13px] font-semibold md:min-h-0 md:gap-1.5">
+ <input type="radio" name={`camera-mode-${slide.id}`} checked={slide.cameraMode === mode} onChange={() => setCameraMode(slide.id, mode)} className="h-[22px] w-[22px] shrink-0 accent-indigo-600 md:h-[16px] md:w-[16px]" />
  {mode === 'auto' ? 'Auto (push in on taps, ease back on scroll)' : 'Manual keyframes'}
  </label>
  ))}
@@ -61,7 +61,7 @@ function CameraKeyRow({
  const anchoredToAction = 'actionId' in cameraKey && cameraKey.actionId !== undefined;
 
  return (
- <div className="mb-1.5 grid grid-cols-2 items-end gap-1.5 rounded-lg bg-white/[.03] p-1.5 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] ">
+ <div className="mb-1.5 grid grid-cols-1 items-end gap-1.5 rounded-lg bg-white/[.03] p-1.5 md:grid-cols-[1fr_1fr_1fr_1fr_auto] ">
  <label className="text-[11px] font-semibold text-[#767e8d] ">
  Anchor
  <select

@@ -58,8 +58,8 @@ export default function StorySceneEditor({ slide }: { slide: StorySlide }) {
  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
  <h4 className="text-[12.5px] font-bold text-[#767e8d] ">Timeline ({timeline.total.toFixed(1)}s)</h4>
  {musicBpm && (
- <label className="flex items-center gap-1.5 text-[12px] font-semibold">
- <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} className="h-[15px] w-[15px] accent-indigo-600" />
+ <label className="flex min-h-11 items-center gap-2 text-[12px] font-semibold md:min-h-0 md:gap-1.5">
+ <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} className="h-[22px] w-[22px] shrink-0 accent-indigo-600 md:h-[15px] md:w-[15px]" />
  Snap durations to {musicBpm} BPM beat
  </label>
  )}

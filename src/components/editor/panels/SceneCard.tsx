@@ -239,7 +239,7 @@ function ImageEffectsFields({
 }) {
   return (
     <>
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
         <Field label="Device motion">
           <Select value={slide.anim} onChange={(v) => setF('anim', v as ImageSlide['anim'])} options={ANIMS} />
         </Field>
@@ -287,7 +287,7 @@ function TextEffectsFields({
   lockedEffects?: Set<Effect>;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
       <Field label="Camera">
         <Select value={slide.camera} onChange={(v) => setF('camera', v as ClassicSlide['camera'])} options={CAMERAS} />
       </Field>
@@ -394,7 +394,7 @@ function CounterEditor({ slide, setF }: { slide: ImageSlide; setF: <K extends ke
       <ToggleRow title="Add an animated count-up number" checked={!!counter} onChange={(v) => setF('counter', v ? DEFAULT_COUNTER : null)} />
       {counter && (
         <>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
             <Field label="From">
               <NumberInput value={counter.from} onChange={(v) => patch({ from: v })} />
             </Field>

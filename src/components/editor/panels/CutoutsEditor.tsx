@@ -110,7 +110,7 @@ export default function CutoutsEditor({ slide, img }: { slide: ImageSlide; img: 
  </button>
  </div>
  {c.id === selectedId && (
- <div className="mt-2 grid grid-cols-2 gap-2">
+ <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
  <label className="block text-[11.5px] font-semibold text-[#767e8d] ">
  Preset
  <select
@@ -136,7 +136,7 @@ export default function CutoutsEditor({ slide, img }: { slide: ImageSlide; img: 
  className="mt-1 block w-full rounded-lg border border-white/[.12] bg-white/[.03] px-2 py-1.5 text-[13px] "
  />
  </label>
- <label className="col-span-2 block text-[11.5px] font-semibold text-[#767e8d] ">
+ <label className="col-span-full block text-[11.5px] font-semibold text-[#767e8d] ">
  Corner radius
  <input type="range" min={0} max={0.5} step={0.01} value={c.radius} onChange={(e) => setCutout(c.id, 'radius', Number(e.target.value))} className="mt-1.5 block w-full accent-indigo-600" />
  </label>
@@ -152,8 +152,8 @@ export default function CutoutsEditor({ slide, img }: { slide: ImageSlide; img: 
  />
  </label>
  )}
- <label className="col-span-2 flex items-center gap-2 text-[12.5px] font-semibold">
- <input type="checkbox" checked={c.hollow} onChange={(e) => setCutout(c.id, 'hollow', e.target.checked)} className="h-[16px] w-[16px] accent-indigo-600" />
+ <label className="col-span-full flex min-h-11 items-center gap-2 text-[12.5px] font-semibold md:min-h-0">
+ <input type="checkbox" checked={c.hollow} onChange={(e) => setCutout(c.id, 'hollow', e.target.checked)} className="h-[22px] w-[22px] shrink-0 accent-indigo-600 md:h-[16px] md:w-[16px]" />
  Hollow out the area it left behind
  </label>
  </div>

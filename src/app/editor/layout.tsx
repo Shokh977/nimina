@@ -1,10 +1,17 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 import EngineFonts from '@/components/EngineFonts';
 import { instrumentSans, spaceGrotesk } from '@/lib/fonts';
 
 export const metadata: Metadata = {
   title: 'Editor',
+};
+
+// viewport-fit=cover lets the phone editor run edge to edge and pad itself
+// with env(safe-area-inset-*) (notch, home indicator).
+export const viewport: Viewport = {
+  themeColor: '#121317',
+  viewportFit: 'cover',
 };
 
 /**

@@ -62,7 +62,7 @@ export default function SlidesPanel() {
   if (selectedSceneId === 'intro') {
     return (
       <div className="grid grid-cols-1 gap-5">
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
           <label className="block">
             <SectionLabel>App name</SectionLabel>
             <input type="text" value={project.appName} onChange={(e) => setAppName(e.target.value)} onFocus={introSeek} className={INPUT_CLASS} />
@@ -112,7 +112,7 @@ export default function SlidesPanel() {
           <SectionLabel>Closing line</SectionLabel>
           <input type="text" value={project.outro.cta} onChange={(e) => setOutro({ cta: e.target.value })} onFocus={outroSeek} className={INPUT_CLASS} />
         </label>
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
           <label className="block">
             <SectionLabel>Button text</SectionLabel>
             <input type="text" value={project.outro.button} onChange={(e) => setOutro({ button: e.target.value })} onFocus={outroSeek} className={INPUT_CLASS} />

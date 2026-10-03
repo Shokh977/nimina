@@ -261,7 +261,7 @@ export default function LanguagesPanel() {
                   const s = strings.find((x) => x.key === p.key);
                   return (
                     <li key={p.key}>
-                      <label className="flex gap-2.5 text-[12.5px]">
+                      <label className="flex min-h-11 gap-2.5 text-[12.5px] md:min-h-0">
                         <input type="checkbox" checked={p.accept} onChange={() => setAiState((st) => ({ ...st, proposals: st.proposals!.map((q, k) => (k === n ? { ...q, accept: !q.accept } : q)) }))} className="mt-1" />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[11px] text-[#767e8d]">
@@ -323,8 +323,8 @@ export default function LanguagesPanel() {
                         const status = stringStatus(entry, s.source);
                         const value = entry?.text ?? s.source;
                         return (
-                          <div key={s.key} className="grid grid-cols-2 gap-2 rounded-[10px] border border-white/[.07] bg-white/[.02] p-2">
-                            <div className="col-span-2 flex items-center justify-between">
+                          <div key={s.key} className="grid grid-cols-1 gap-2 rounded-[10px] md:grid-cols-2 border border-white/[.07] bg-white/[.02] p-2">
+                            <div className="col-span-full flex items-center justify-between">
                               <span className="text-[11.5px] text-[#767e8d]">{fieldLabel(s.field)}</span>
                               <button
                                 type="button"
@@ -349,7 +349,7 @@ export default function LanguagesPanel() {
                               style={{ fontFamily: textFont(active.locale) }}
                               className="w-full resize-none rounded-[8px] border border-white/[.12] bg-black/20 px-2 py-1 text-[12.5px] leading-snug text-[#f4f5f8] outline-none focus-visible:border-[#8b7dff]"
                             />
-                            <div className="col-span-2 empty:hidden">
+                            <div className="col-span-full empty:hidden">
                               <HighlightWarning text={value} onFix={(fixed) => setTranslation(active.locale, s.key, fixed)} />
                             </div>
                           </div>

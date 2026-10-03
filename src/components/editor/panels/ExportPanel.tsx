@@ -8,6 +8,7 @@ import { outputDimensions, qualityToResolution, resolutionToQuality, type Export
 import { getTimeline } from '@/engine/render';
 import { FORMATS } from '@/engine/constants';
 import type { Format } from '@/engine/types';
+import { deviceExportCap, PHONE_EXPORT_NOTE } from '@/lib/device';
 import { isPro, PLAN_LIMITS } from '@/lib/plan';
 import { useEditorStore } from '@/store/editorStore';
 import SectionLabel from '../ui/SectionLabel';
@@ -74,8 +75,13 @@ function VideoExportPanel() {
   const [selectedFormats, setSelectedFormats] = useState<Format[]>([project.format]);
 
   const pro = isPro(plan);
-  const maxResolution = PLAN_LIMITS[plan].maxExportResolution;
-  const resolution = qualityToResolution(project.quality);
+  const planMax = PLAN_LIMITS[plan].maxExportResolution;
+  const maxResolution = deviceExportCap(planMax);
+  const phoneCapped = maxResolution !== planMax;
+  // What will actually render — a 4K setting chosen on a computer shows (and
+  // renders) as 720p on a phone.
+  const chosen = qualityToResolution(project.quality);
+  const resolution = RESOLUTION_RANK[chosen] > RESOLUTION_RANK[maxResolution] ? maxResolution : chosen;
   const total = getTimeline(project).total;
 
   const toggleFormat = (f: Format) => {
@@ -121,6 +127,7 @@ function VideoExportPanel() {
             setQuality(resolutionToQuality(v));
           }}
         />
+        {phoneCapped && <p className="mt-2 text-[12px] leading-snug text-[#ffd166]">{PHONE_EXPORT_NOTE}</p>}
         <p className="mt-2 text-[12px] text-[#767e8d]">{total.toFixed(1)}s total</p>
       </div>
 

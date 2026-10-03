@@ -38,7 +38,7 @@ export default function StyleEditor({
  </>
  }
  >
- <div className="grid grid-cols-2 gap-2.5">
+ <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
  {keys.map((key) => {
  const field = STYLE_FIELDS[key];
  const current = (style[key] as string | undefined) ?? '';

@@ -7,6 +7,7 @@ import { ensureProjectFonts, exportVideo, renderStillBlob, stillTimeFor, type Ex
 import { localizeProject } from '@/engine/localization';
 import type { Format } from '@/engine/types';
 import { slug } from '@/engine/utils';
+import { deviceExportCap } from '@/lib/device';
 import { logEvent } from '@/lib/events';
 import { PLAN_LIMITS } from '@/lib/plan';
 import { createClient } from '@/lib/supabase/client';
@@ -63,7 +64,8 @@ export function useBatchExport() {
     const limits = PLAN_LIMITS[plan];
     // Same plan enforcement as the single-language exports.
     const locales = req.locales.filter((l) => base.localization?.languages.some((x) => x.locale === l)).slice(0, limits.maxLanguages);
-    const resolution = RESOLUTION_RANK[req.resolution] > RESOLUTION_RANK[limits.maxExportResolution] ? limits.maxExportResolution : req.resolution;
+    const maxResolution = deviceExportCap(limits.maxExportResolution);
+    const resolution = RESOLUTION_RANK[req.resolution] > RESOLUTION_RANK[maxResolution] ? maxResolution : req.resolution;
     const targets = req.imageTargets.filter((t) => limits.imageExport.customSize || !t.custom).slice(0, limits.imageExport.maxPresets);
     if (!locales.length || (!req.videoFormats.length && !targets.length)) return;
 

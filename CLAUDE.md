@@ -661,6 +661,24 @@ redeploy, run `node --env-file=.env.local scripts/repoint-public-url.mjs
    two buckets → `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`; the account
    id is `R2_ACCOUNT_ID`. Same six vars in `.env.local` and on the host.
 
+## Phone editor
+
+Below 768px wide (or a touch screen under 500px tall, i.e. a phone in
+landscape) — `PHONE_QUERY` in `src/lib/device.ts` — `EditorShellBody`
+renders `src/components/editor/mobile/MobileEditor.tsx` instead of the
+three-column desktop shell; the desktop layout is untouched. Portrait:
+header (undo/redo + a menu holding Preview, Export, AI Director/Languages,
+billing, account) · canvas · transport · horizontal slide strip · tab bar
+(Slides, Slide, Look, Motion, Export) opening a draggable bottom sheet.
+Landscape docks the section beside the canvas instead. The root is pinned
+to `window.visualViewport`, so the sheet and a focused field stay above
+the on-screen keyboard. `Stage` has a `touch` mode: pinch zoom (re-renders
+sharp on release, max 3×), two-finger pan, taps still reach the
+tap-to-edit text. Panels are shared with desktop; `data-touch-ui` rules in
+`globals.css` give every control a 44px target and fields 16px text (no
+iOS focus zoom), and form rows are `grid-cols-1 md:grid-cols-2`. Phones
+export at most 720p (`deviceExportCap`, with a note in the Export panel).
+
 ## Operations
 
 Backups (weekly pg_dump to R2, proven by an automatic restore), the

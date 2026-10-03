@@ -78,7 +78,7 @@ export default function StoryActionCard({
  </div>
  </div>
 
- <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+ <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
  <NumField
  label={snapBpm ? `Duration (s, snapped to ${snapBpm} BPM)` : 'Duration (s)'}
  value={action.duration}
@@ -138,7 +138,7 @@ function ActionFields({ slide, action, previewImg, patch }: { slide: StorySlide;
 
  case 'showScreen':
  return (
- <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+ <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
  <SelectField
  label="Screen"
  value={action.screenId}
@@ -152,7 +152,7 @@ function ActionFields({ slide, action, previewImg, patch }: { slide: StorySlide;
 
  case 'loading':
  return (
- <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+ <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
  <SelectField label="Style" value={action.style} options={LOADING_STYLES} onChange={(style) => patch<typeof action>({ style })} />
  {action.style === 'splash' && <IconAssetField label="logo" assetId={action.logoAssetId} onChange={(id) => patch<typeof action>({ logoAssetId: id })} />}
  </div>
@@ -160,11 +160,11 @@ function ActionFields({ slide, action, previewImg, patch }: { slide: StorySlide;
 
  case 'scroll':
  return (
- <div className="grid grid-cols-1 items-end gap-2.5 sm:grid-cols-3">
+ <div className="grid grid-cols-1 items-end gap-2.5 md:grid-cols-3">
  <NumField label="From (0-1)" value={action.from} min={0} max={1} step={0.05} onChange={(from) => patch<typeof action>({ from })} />
  <NumField label="To (0-1)" value={action.to} min={0} max={1} step={0.05} onChange={(to) => patch<typeof action>({ to })} />
- <label className="mb-2 flex items-center gap-1.5 text-[12.5px] font-semibold">
- <input type="checkbox" checked={!!action.overshoot} onChange={(e) => patch<typeof action>({ overshoot: e.target.checked })} className="h-[16px] w-[16px] accent-indigo-600" />
+ <label className="mb-2 flex min-h-11 items-center gap-2 text-[12.5px] font-semibold md:min-h-0 md:gap-1.5">
+ <input type="checkbox" checked={!!action.overshoot} onChange={(e) => patch<typeof action>({ overshoot: e.target.checked })} className="h-[22px] w-[22px] shrink-0 accent-indigo-600 md:h-[16px] md:w-[16px]" />
  Overshoot
  </label>
  </div>
@@ -202,7 +202,7 @@ function ActionFields({ slide, action, previewImg, patch }: { slide: StorySlide;
  <ScreenPlacementPicker image={previewImg} points={[{ x: action.x, y: action.y, color: ACCENT }]} onPick={(x, y) => patch<typeof action>({ x, y })} />
  <div className="grid min-w-0 flex-1 gap-2">
  <TextField label="Text" value={action.text} onChange={(text) => patch<typeof action>({ text })} />
- <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+ <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
  <NumField label="Field width" value={action.width} min={0.1} max={1} step={0.05} onChange={(width) => patch<typeof action>({ width })} />
  <NumField label="Chars/sec" value={action.charsPerSecond} min={1} max={60} step={1} onChange={(charsPerSecond) => patch<typeof action>({ charsPerSecond })} />
  </div>
@@ -214,7 +214,7 @@ function ActionFields({ slide, action, previewImg, patch }: { slide: StorySlide;
  return (
  <div className="flex flex-wrap items-start gap-3">
  <ScreenPlacementPicker image={previewImg} rect={{ x: action.x, y: action.y, w: action.w, h: action.h, color: ACCENT }} onPick={(x, y) => patch<typeof action>({ x, y })} />
- <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+ <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-2">
  <NumField label="Width" value={action.w} min={0.05} max={1} step={0.02} onChange={(w) => patch<typeof action>({ w })} />
  <NumField label="Height" value={action.h} min={0.05} max={1} step={0.02} onChange={(h) => patch<typeof action>({ h })} />
  </div>

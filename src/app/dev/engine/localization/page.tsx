@@ -88,18 +88,18 @@ export default function LocalizationHarness() {
           </button>
         ))}
       </div>
-      <EditorShellBody userEmail="harness@local" projectName="Localization harness" saveStatus="saved" onExportClick={() => setTab('export')}>
-        <div role="tablist" className="flex gap-1 border-b border-white/[.07] p-2 pb-0">
-          {(['languages', 'export'] as const).map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className="flex-1 rounded-[9px] px-1.5 py-[9px] text-[13px] font-semibold text-[#9aa1af] capitalize aria-selected:bg-[#5b4bff]/[.18] aria-selected:text-[#cfc8ff]">
-              {t}
-            </button>
-          ))}
-        </div>
-        <div className="min-w-0 flex-1 overflow-y-auto p-4" key={sceneCount}>
-          {tab === 'languages' ? <LanguagesPanel /> : <ExportPanel />}
-        </div>
-      </EditorShellBody>
+      <EditorShellBody
+        userEmail="harness@local"
+        projectName="Localization harness"
+        saveStatus="saved"
+        tabs={[
+          { id: 'languages', label: 'Languages' },
+          { id: 'export', label: 'Export' },
+        ]}
+        activeTab={tab}
+        onTabChange={(id) => setTab(id as 'languages' | 'export')}
+        panel={<div key={sceneCount}>{tab === 'languages' ? <LanguagesPanel /> : <ExportPanel />}</div>}
+      />
     </>
   );
 }
