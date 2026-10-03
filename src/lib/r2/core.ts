@@ -59,12 +59,14 @@ export class R2 {
    * Content-Length (both are part of the signature, so R2 rejects an upload
    * that differs from what the server approved). The uploader must send
    * the returned headers unchanged. */
-  async signPut(bucket: string, key: string, contentType: string, contentLength: number, expiresIn = 600): Promise<{ url: string; headers: Record<string, string> }> {
+  async signPut(bucket: string, key: string, contentType: string, contentLength: number, expiresIn = 600, cacheControl?: string): Promise<{ url: string; headers: Record<string, string> }> {
     const url = new URL(this.objectUrl(bucket, key));
     url.searchParams.set('X-Amz-Expires', String(expiresIn));
-    const headers = { 'content-type': contentType, 'content-length': String(contentLength) };
-    const signed = await this.aws.sign(new Request(url, { method: 'PUT', headers }), { aws: { signQuery: true, allHeaders: true } });
-    return { url: signed.url, headers: { 'content-type': contentType } };
+    // Cache-Control, when given, is signed too: the uploader must send it,
+    // and R2 stores it with the object (served on every read).
+    const sent: Record<string, string> = { 'content-type': contentType, ...(cacheControl ? { 'cache-control': cacheControl } : {}) };
+    const signed = await this.aws.sign(new Request(url, { method: 'PUT', headers: { ...sent, 'content-length': String(contentLength) } }), { aws: { signQuery: true, allHeaders: true } });
+    return { url: signed.url, headers: sent };
   }
 
   async put(bucket: string, key: string, body: BodyInit, contentType: string, cacheControl?: string): Promise<void> {
@@ -95,6 +97,18 @@ export class R2 {
     const source = `${bucket}/${fromKey.split('/').map(encodeURIComponent).join('/')}`;
     const res = await this.aws.fetch(this.objectUrl(bucket, toKey), { method: 'PUT', headers: { 'x-amz-copy-source': source } });
     if (!res.ok) throw new Error(`R2 copy ${fromKey} -> ${toKey} failed: ${res.status} ${await res.text()}`);
+  }
+
+  /** Rewrites an object's Content-Type / Cache-Control in place (copy onto
+   * itself) — for files uploaded straight from a browser, which can only
+   * send the headers the bucket's CORS rule allows. */
+  async setHeaders(bucket: string, key: string, contentType: string, cacheControl: string): Promise<void> {
+    const source = `${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`;
+    const res = await this.aws.fetch(this.objectUrl(bucket, key), {
+      method: 'PUT',
+      headers: { 'x-amz-copy-source': source, 'x-amz-metadata-directive': 'REPLACE', 'content-type': contentType, 'cache-control': cacheControl },
+    });
+    if (!res.ok) throw new Error(`R2 header update ${key} failed: ${res.status} ${await res.text()}`);
   }
 
   async delete(bucket: string, key: string): Promise<void> {

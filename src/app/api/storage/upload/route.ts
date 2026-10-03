@@ -7,7 +7,7 @@ import { recount, reserve } from '@/lib/storage/usage';
 import { createClient } from '@/lib/supabase/server';
 
 const Body = z.object({
-  kind: z.enum(['image', 'audio', 'thumbnail', 'template-preview']),
+  kind: z.enum(['image', 'audio', 'thumbnail', 'template-preview', 'music-library']),
   projectId: z.string().regex(SAFE_SEGMENT),
   assetId: z.string().regex(SAFE_SEGMENT).optional(),
   contentType: z.string().max(100),
@@ -43,6 +43,16 @@ export async function POST(request: Request) {
   if (problem) return NextResponse.json({ error: problem }, { status: 413 });
 
   const store = r2();
+  if (kind === 'music-library') {
+    // Admins only; a fresh key per upload, so the file can be cached forever.
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    if (profile?.role !== 'admin') return NextResponse.json({ error: 'Admins only.' }, { status: 403 });
+    const key = `music-library/${crypto.randomUUID()}.mp3`;
+    // Cache-Control is set by /api/admin/music once the file is in (the
+    // bucket's CORS rule only lets browsers send content-type).
+    const signed = await store.signPut(store.bucketName('public'), key, contentType, size);
+    return NextResponse.json({ ...signed, path: key.slice('music-library/'.length), publicUrl: store.publicObjectUrl(key) });
+  }
   if (kind === 'template-preview') {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
     if (profile?.role !== 'admin') return NextResponse.json({ error: 'Admins only.' }, { status: 403 });

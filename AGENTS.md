@@ -723,6 +723,29 @@ Latin scripts); the Languages tab lists which characters a font lacks. The
 standing font check covers an uploaded font (fixture
 `public/dev-fixtures/upload-test.woff2`, Noto Sans, OFL).
 
+## Music library
+
+Admins manage it at `/admin/music`. An upload (MP3/M4A/WAV) is decoded and
+re-encoded to a 128 kbps MP3 (~1 MB/min) in the admin's browser
+(`src/lib/audio/prepareTrack.ts`, lamejs), with 160 waveform peaks, PUT to
+the public R2 bucket under `music-library/<uuid>.mp3`, then saved via
+`/api/admin/music`, which re-reads the stored file's MP3 header and refuses
+anything outside 128–160 kbps, sets `Cache-Control: public,
+max-age=31536000, immutable` (each upload has its own key), and requires
+title, artist, mood, genre, BPM and the licence source + notes — also
+enforced by NOT NULL/CHECK constraints (migration 0022): we redistribute
+these files. Tracks can be deactivated (hidden from users, still playable
+in projects that use them), reordered, made free/Pro, or deleted.
+
+Editor: Motion → Music has Library (mood/genre filters, waveform preview;
+Pro-only tracks are greyed with an upgrade prompt for free users, who can
+still preview) and Upload your own. A picked library track becomes
+`project.music` (`library:<path>`) with its decoded buffer, so preview and
+export (loop, fade-out, ducking) treat it exactly like an upload. Like the
+other plan gates this is enforced in the browser (the files are public).
+`scripts/seed-music-library.ts` (re)creates the procedural placeholder
+tracks in the same MP3 format.
+
 ## Operations
 
 Backups (weekly pg_dump to R2, proven by an automatic restore), the

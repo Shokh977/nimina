@@ -9,29 +9,38 @@ import { publicFileUrl } from '@/lib/storage/assets';
 export interface MusicLibraryTrack {
   id: string;
   name: string;
+  artist: string;
+  mood: string;
+  genre: string;
   storagePath: string;
   bpm: number;
   durationSeconds: number;
-  category: string;
+  /** Library tracks are Pro unless an admin marks one free. */
+  proOnly: boolean;
+  /** 0–1 waveform for the preview (null for very old rows). */
+  peaks: number[] | null;
   /** 'original' | 'cc0' | 'licensed' — see supabase/migrations/0011_music_license.sql. */
   license: string;
-  licenseNote: string | null;
-  author: string | null;
+  licenceSource: string;
 }
 
+/** Active tracks in the admin's order (/admin/music). */
 export async function listMusicLibrary(supabase: SupabaseClient): Promise<MusicLibraryTrack[]> {
-  const { data, error } = await supabase.from('music_tracks').select('id, name, storage_path, bpm, duration_seconds, category, license, license_note, author').order('category').order('name');
+  const { data, error } = await supabase.from('music_tracks').select('id, name, artist, mood, genre, storage_path, bpm, duration_seconds, pro_only, peaks, license, licence_source').eq('active', true).order('sort_order').order('created_at');
   if (error) throw error;
   return (data ?? []).map((row) => ({
     id: row.id as string,
     name: row.name as string,
+    artist: row.artist as string,
+    mood: row.mood as string,
+    genre: row.genre as string,
     storagePath: row.storage_path as string,
     bpm: row.bpm as number,
-    durationSeconds: row.duration_seconds as number,
-    category: row.category as string,
+    durationSeconds: Number(row.duration_seconds),
+    proOnly: row.pro_only as boolean,
+    peaks: (row.peaks as number[] | null) ?? null,
     license: row.license as string,
-    licenseNote: row.license_note as string | null,
-    author: row.author as string | null,
+    licenceSource: row.licence_source as string,
   }));
 }
 

@@ -12,7 +12,7 @@ export interface StorageUsage {
   plan: Plan;
 }
 
-export type UploadKind = 'image' | 'audio' | 'thumbnail' | 'template-preview';
+export type UploadKind = 'image' | 'audio' | 'thumbnail' | 'template-preview' | 'music-library';
 
 export const UPLOAD_RULES: Record<UploadKind, { maxBytes: number; types: string[]; label: string }> = {
   image: { maxBytes: 15 * 1024 * 1024, types: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'], label: 'Images (PNG, JPEG, WebP or GIF) up to 15 MB' },
@@ -23,6 +23,8 @@ export const UPLOAD_RULES: Record<UploadKind, { maxBytes: number; types: string[
   },
   thumbnail: { maxBytes: 1024 * 1024, types: ['image/jpeg'], label: 'Thumbnail' },
   'template-preview': { maxBytes: 100 * 1024 * 1024, types: ['video/mp4', 'video/webm'], label: 'Preview video up to 100 MB' },
+  // Admin music library: always our transcoded 128 kbps MP3 (~1 MB/min) — 20 MB ≈ 20 minutes.
+  'music-library': { maxBytes: 20 * 1024 * 1024, types: ['audio/mpeg'], label: 'MP3 up to 20 MB' },
 };
 
 /** Project/template ids and asset ids become path segments — keep them to a safe alphabet. */
