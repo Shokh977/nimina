@@ -1,12 +1,11 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { ANIMS, CAMERAS, DEFAULT_COUNTER, DURS, EFFECTS, GESTURES, LAYOUTS, MOTION3D, POSE_PRESETS, PRESETS } from '@/engine/constants';
 import type { ClassicSlide, CounterConfig, CounterFormat, Effect, ImageSlide, Pose3D, PosePresetKey, Slide } from '@/engine/types';
-import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
+import { assetSrc } from '@/lib/assetSrc';
 import { isPro, PRO_ONLY_EFFECTS } from '@/lib/plan';
-import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from '../PlaybackContext';
 import StyleEditor from '../StyleEditor';
@@ -20,6 +19,7 @@ import SwatchGrid from '../ui/SwatchGrid';
 import ToggleRow from '../ui/ToggleRow';
 import CutoutsEditor from './CutoutsEditor';
 import StorySceneEditor from './story/StorySceneEditor';
+import { droppedImages, useScreenshots } from '../useScreenshots';
 import VideoClipEditor from './VideoClipEditor';
 
 const GHOST_BTN = 'grid h-9 w-9 place-items-center rounded-[10px] border border-white/[.12] bg-white/[.03] text-[13px] font-semibold text-[#c9cdd8] transition-colors duration-[.16s] hover:bg-white/[.08] disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff]';
@@ -31,7 +31,6 @@ const BG_SWATCHES = PRESETS.map((p, i) => ({ id: String(i), background: `linear-
 export default function SceneCard({ slide, index, count }: { slide: Slide; index: number; count: number }) {
   const project = useEditorStore((s) => s.project);
   const assets = useEditorStore((s) => s.assets);
-  const projectId = useEditorStore((s) => s.projectId);
   const plan = useEditorStore((s) => s.plan);
   const lockedEffects: Set<Effect> | undefined = isPro(plan) ? undefined : new Set(PRO_ONLY_EFFECTS);
   const updateSlide = useEditorStore((s) => s.updateSlide);
@@ -41,9 +40,10 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
   const setSlideStyle = useEditorStore((s) => s.setSlideStyle);
   const resetSlideStyle = useEditorStore((s) => s.resetSlideStyle);
   const applyStyleToAll = useEditorStore((s) => s.applyStyleToAll);
-  const replaceSlideImage = useEditorStore((s) => s.replaceSlideImage);
   const { seek, playFrom } = usePlayback();
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const { put } = useScreenshots();
+  const [dropping, setDropping] = useState(false);
 
   const moveRow = (
     <div className="flex justify-end gap-1.5">
@@ -101,11 +101,8 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
   const onReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !image || rejectUpload(file, projectId)) return;
-    const { image: newImage } = await loadImageFile(file);
-    const assetId = newAssetId('img');
-    replaceSlideImage(slide.id, assetId, newImage);
-    if (projectId) uploadAsset(projectId, assetId, file).catch((err) => console.error('[assets] upload failed', err));
+    if (!file || !image) return;
+    await put({ slideId: slide.id }, file);
     seek(start + 1.4);
   };
 
@@ -120,19 +117,53 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
 
       {slide.kind === 'video' && <VideoClipEditor slide={slide} />}
 
-      {!isText && !isVideo && (
-        <div onClick={onThumbClick} className={`relative inline-block w-full overflow-hidden rounded-xl bg-black/40 leading-none ${pick ? 'cursor-crosshair' : 'cursor-pointer'}`}>
+      {!isText && !isVideo && image && (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDropping(true);
+          }}
+          onDragLeave={() => setDropping(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDropping(false);
+            const file = droppedImages(e)[0];
+            if (file) void put({ slideId: slide.id }, file).then(() => seek(start + 1.4));
+          }}
+          className={`relative rounded-xl ${dropping ? 'ring-2 ring-[#8b7dff]' : ''}`}
+        >
           {img ? (
-            // eslint-disable-next-line @next/next/no-img-element -- in-memory/data-URL asset, not a static/remote file Next's Image optimizer can handle
-            <img src={assetSrc(img)} alt={`Screenshot for slide ${index + 1}`} className="mx-auto h-[140px] w-auto max-w-full object-contain" />
+            <div onClick={onThumbClick} className={`relative inline-block w-full overflow-hidden rounded-xl bg-black/40 leading-none ${pick ? 'cursor-crosshair' : 'cursor-pointer'}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- in-memory/data-URL asset, not a static/remote file Next's Image optimizer can handle */}
+              <img src={assetSrc(img)} alt={`Screenshot for slide ${index + 1}`} className="mx-auto h-[140px] w-auto max-w-full object-contain" />
+              {pick && (
+                <span
+                  style={{ left: `${image.focus.x * 100}%`, top: `${image.focus.y * 100}%` }}
+                  className="pointer-events-none absolute h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[#ffd166] shadow-[0_0_0_2px_rgba(0,0,0,.45)]"
+                />
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  replaceInputRef.current?.click();
+                }}
+                className="absolute top-2 right-2 rounded-[9px] bg-[#08090c]/80 px-2.5 py-1.5 text-[12px] font-semibold text-white ring-1 ring-white/20 backdrop-blur-sm hover:bg-[#5b4bff]"
+              >
+                Replace
+              </button>
+            </div>
           ) : (
-            <div className="grid h-[140px] place-items-center text-[12.5px] text-[#6d7484]">No image</div>
-          )}
-          {pick && image && (
-            <span
-              style={{ left: `${image.focus.x * 100}%`, top: `${image.focus.y * 100}%` }}
-              className="pointer-events-none absolute h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[#ffd166] shadow-[0_0_0_2px_rgba(0,0,0,.45)]"
-            />
+            <button
+              type="button"
+              onClick={() => replaceInputRef.current?.click()}
+              className="grid h-[140px] w-full place-items-center rounded-xl border-2 border-dashed border-[#8b7dff]/50 bg-[#5b4bff]/[.08] text-center hover:bg-[#5b4bff]/[.14]"
+            >
+              <span>
+                <span className="block text-[14px] font-semibold text-[#cfc8ff]">＋ Add screenshot</span>
+                <span className="mt-1 block text-[12px] text-[#9aa1af]">Click, or drop an image here</span>
+              </span>
+            </button>
           )}
         </div>
       )}
@@ -169,17 +200,7 @@ export default function SceneCard({ slide, index, count }: { slide: Slide; index
 
       {!isText && (
         <div>
-          <SectionLabel
-            trailing={
-              isVideo ? undefined : (
-                <button onClick={() => replaceInputRef.current?.click()} className="text-[12px] font-semibold text-[#8b7dff] hover:text-[#a89bff]">
-                  Replace screenshot
-                </button>
-              )
-            }
-          >
-            Background
-          </SectionLabel>
+          <SectionLabel>Background</SectionLabel>
           <SwatchGrid items={BG_SWATCHES} value={slide.style.theme ?? ''} onChange={(id) => setSlideStyle(slide.id, 'theme', id)} size={42} shape="rounded" />
           <input ref={replaceInputRef} type="file" accept="image/*" className="hidden" onChange={onReplace} />
         </div>

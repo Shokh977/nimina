@@ -6,6 +6,7 @@ import type { StorySlide } from '@/engine/types';
 import { assetSrc, loadImageFile, newAssetId } from '@/lib/assetSrc';
 import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
+import { droppedImages, useScreenshots } from '../../useScreenshots';
 
 /** The story slide's full/tall screenshots — referenced by id from
  * `showScreen` actions. Order here only affects display; what matters is
@@ -15,7 +16,7 @@ export default function ScreensStrip({ slide }: { slide: StorySlide }) {
  const projectId = useEditorStore((s) => s.projectId);
  const registerImage = useEditorStore((s) => s.registerImage);
  const addStoryScreen = useEditorStore((s) => s.addStoryScreen);
- const setStoryScreenAsset = useEditorStore((s) => s.setStoryScreenAsset);
+ const { put } = useScreenshots();
  const removeStoryScreen = useEditorStore((s) => s.removeStoryScreen);
  const moveStoryScreen = useEditorStore((s) => s.moveStoryScreen);
  const addInputRef = useRef<HTMLInputElement>(null);
@@ -40,8 +41,8 @@ export default function ScreensStrip({ slide }: { slide: StorySlide }) {
  const onReplaceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
  const file = e.target.files?.[0];
  e.target.value = '';
- if (!file || !replacingScreenId || rejectUpload(file, projectId)) return;
- setStoryScreenAsset(slide.id, replacingScreenId, await loadAndRegister(file));
+ if (!file || !replacingScreenId) return;
+ await put({ slideId: slide.id, screenId: replacingScreenId }, file);
  };
 
  return (
@@ -52,12 +53,29 @@ export default function ScreensStrip({ slide }: { slide: StorySlide }) {
  const img = assets.images[screen.assetId];
  return (
  <div key={screen.id} className="w-[84px]">
- <div className="relative overflow-hidden rounded-xl bg-black">
+ <div
+ className="relative overflow-hidden rounded-xl bg-black"
+ onDragOver={(e) => e.preventDefault()}
+ onDrop={(e) => {
+ e.preventDefault();
+ const file = droppedImages(e)[0];
+ if (file) void put({ slideId: slide.id, screenId: screen.id }, file);
+ }}
+ >
  {img ? (
  // eslint-disable-next-line @next/next/no-img-element -- in-memory/data-URL asset
  <img src={assetSrc(img)} alt={`Screen ${i + 1}`} className="h-[130px] w-[84px] object-cover" />
  ) : (
- <div className="grid h-[130px] w-[84px] place-items-center text-[11px] text-[#767e8d]">No image</div>
+ <button
+ type="button"
+ onClick={() => {
+ setReplacingScreenId(screen.id);
+ replaceInputRef.current?.click();
+ }}
+ className="grid h-[130px] w-[84px] place-items-center rounded-xl border-2 border-dashed border-[#8b7dff]/50 bg-[#5b4bff]/[.1] px-1 text-center text-[11.5px] font-semibold text-[#cfc8ff] hover:bg-[#5b4bff]/[.18]"
+ >
+ ＋ Add screenshot
+ </button>
  )}
  </div>
  <p className="mt-1 truncate text-center text-[11px] font-semibold text-[#767e8d] ">Screen {i + 1}</p>
@@ -78,9 +96,10 @@ export default function ScreensStrip({ slide }: { slide: StorySlide }) {
  setReplacingScreenId(screen.id);
  replaceInputRef.current?.click();
  }}
+ title="Replace this screenshot"
  className="rounded border border-white/[.12] bg-white/[.03] px-1 text-[10.5px] "
  >
- ⟳
+ Replace
  </button>
  <button onClick={() => removeStoryScreen(slide.id, screen.id)} className="rounded border border-white/[.12] bg-white/[.03] px-1 text-[10.5px] text-[#ff8f76] ">
  ✕

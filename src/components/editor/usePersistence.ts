@@ -86,6 +86,7 @@ export function usePersistence(projectId: string, initialProject: Project): Save
 
     async function hydrate() {
       useEditorStore.getState().loadProject(initialProject, projectId);
+      useEditorStore.getState().setAssetsReady(false);
 
       const imageIds = new Set<string>();
       initialProject.scenes.forEach((s) => {
@@ -166,6 +167,7 @@ export function usePersistence(projectId: string, initialProject: Project): Save
       );
 
       if (!cancelled) {
+        useEditorStore.getState().setAssetsReady(true);
         setStatus('saved');
         attachAutosave();
       }

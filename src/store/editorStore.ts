@@ -81,6 +81,11 @@ interface EditorState {
   plan: Plan;
   setPlan: (plan: Plan) => void;
 
+  /** False while a saved project's files are still loading — so a screen
+   * isn't reported as missing a screenshot that's on its way. */
+  assetsReady: boolean;
+  setAssetsReady: (ready: boolean) => void;
+
   /** Replaces the whole project (e.g. loading a saved one) and resets history. */
   loadProject: (project: Project, projectId: string | null, assets?: Partial<EditorAssets>) => void;
 
@@ -424,6 +429,8 @@ export const useEditorStore = create<EditorState>((set, get) => {
       ),
     setLanguageFontScale: (locale, fontScale) => update((p) => mapLanguage(p, locale, (l) => ({ ...l, fontScale }))),
 
+    assetsReady: true,
+    setAssetsReady: (assetsReady) => set({ assetsReady }),
     selectedSceneId: defaultSelection(initialProject),
     selectScene: (id) => set({ selectedSceneId: id, audioSelection: null }),
     audioSelection: null,
@@ -444,6 +451,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         selectedSceneId: defaultSelection(normalized),
         audioSelection: null,
         musicDrawerOpen: false,
+        assetsReady: true,
         previewLocale: null,
       }));
     },

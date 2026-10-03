@@ -11,6 +11,7 @@ import { rejectUpload, uploadAsset } from '@/lib/storage/assets';
 import { useEditorStore } from '@/store/editorStore';
 import { usePlayback } from './PlaybackContext';
 import { MAX_RECORDING_SECONDS, openRecording } from './video/recordings';
+import { missingScreens } from './useScreenshots';
 import { newVideoClip } from '@/engine/video';
 
 /** One row of the slide list — intro, each slide, outro — shared by the
@@ -26,6 +27,8 @@ export interface SlideEntry {
   colorB: string;
   /** A screenshot to show as the thumbnail, when the slide has one. */
   thumb: string | null;
+  /** The slide shows an empty phone: a screen with no screenshot yet. */
+  missing?: boolean;
   onSelect: () => void;
   onToggleVisible: () => void;
   visibleTitle: string;
@@ -57,6 +60,7 @@ export function useSlideEntries(): SlideEntry[] {
   const project = useEditorStore((s) => s.project);
   const images = useEditorStore((s) => s.assets.images);
   const videos = useEditorStore((s) => s.assets.videos);
+  const ready = useEditorStore((s) => s.assetsReady);
   const selectedSceneId = useEditorStore((s) => s.selectedSceneId);
   const selectScene = useEditorStore((s) => s.selectScene);
   const updateSlide = useEditorStore((s) => s.updateSlide);
@@ -86,6 +90,7 @@ export function useSlideEntries(): SlideEntry[] {
     },
   ];
 
+  const missing = new Set(missingScreens(project, images, ready).map((m) => m.slideId));
   // Each slide's start time, for seeking on select (hidden slides take no time).
   let cursor = project.intro.on ? project.intro.dur : 0;
   project.scenes.forEach((slide, index) => {
@@ -102,10 +107,12 @@ export function useSlideEntries(): SlideEntry[] {
       selected: selectedSceneId === slide.id,
       colorA: style.colors.a,
       colorB: style.colors.b,
+      missing: missing.has(slide.id),
       thumb: slide.kind === 'video' ? (slide.video.assetId ? thumbOf(videos[slide.video.assetId]?.poster) : null) : thumbId ? thumbOf(images[thumbId]) : null,
       onSelect: () => {
         selectScene(slide.id);
-        if (!slide.hidden) seek(startAt);
+        // An empty phone: show it settled in place (not mid-entrance), where its "Add screenshot" button sits.
+        if (!slide.hidden) seek(startAt + (missing.has(slide.id) ? Math.min(1.4, rawDuration(slide) / 2) : 0));
       },
       onToggleVisible: () => updateSlide(slide.id, { hidden: !slide.hidden }),
       visibleTitle: slide.hidden ? 'Show slide' : 'Hide slide',

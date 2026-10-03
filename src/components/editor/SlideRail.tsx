@@ -2,10 +2,33 @@
 
 import StorageMeter from '@/components/storage/StorageMeter';
 import { useEditorStore } from '@/store/editorStore';
+import FillScreensBanner from './FillScreensBanner';
 import SectionLabel from './ui/SectionLabel';
 import { useAddSlides, useSlideEntries } from './useSlideList';
 
-function Row({ selected, hidden, colorA, colorB, name, duration, onSelect, onToggleVisible, visibleTitle }: { selected: boolean; hidden: boolean; colorA: string; colorB: string; name: string; duration: number; onSelect: () => void; onToggleVisible?: () => void; visibleTitle?: string }) {
+function Row({
+  selected,
+  hidden,
+  missing,
+  colorA,
+  colorB,
+  name,
+  duration,
+  onSelect,
+  onToggleVisible,
+  visibleTitle,
+}: {
+  selected: boolean;
+  hidden: boolean;
+  missing?: boolean;
+  colorA: string;
+  colorB: string;
+  name: string;
+  duration: number;
+  onSelect: () => void;
+  onToggleVisible?: () => void;
+  visibleTitle?: string;
+}) {
   return (
     <div className="relative">
       <button
@@ -17,7 +40,9 @@ function Row({ selected, hidden, colorA, colorB, name, duration, onSelect, onTog
         <span className="h-full min-h-[30px] w-[5px] shrink-0 self-stretch rounded-full" style={{ background: `linear-gradient(150deg, ${colorA}, ${colorB})` }} />
         <span className="min-w-0 flex-1">
           <span className={`block text-[12.5px] leading-[1.25] font-semibold break-words ${hidden ? 'text-[#6d7484]' : 'text-[#f4f5f8]'}`}>{name}</span>
-          <span className="mt-0.5 block text-[11px] text-[#767e8d]">{duration.toFixed(1)}s</span>
+          <span className="mt-0.5 block text-[11px] text-[#767e8d]">
+            {duration.toFixed(1)}s{missing && <span className="ml-1.5 font-semibold text-[#ffd166]">· needs screenshot</span>}
+          </span>
         </span>
       </button>
       {onToggleVisible && (
@@ -42,12 +67,14 @@ export default function SlideRail() {
   return (
     <div className="flex h-full flex-col p-3">
       <SectionLabel>Slides</SectionLabel>
+      <FillScreensBanner />
       <div className="flex flex-col gap-2 overflow-y-auto">
         {entries.map((e) => (
           <Row
             key={e.key}
             selected={e.selected}
             hidden={e.hidden}
+            missing={e.missing}
             colorA={e.colorA}
             colorB={e.colorB}
             name={e.name}

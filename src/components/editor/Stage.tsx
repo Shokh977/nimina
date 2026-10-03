@@ -7,6 +7,7 @@ import { FORMATS } from '@/engine/constants';
 import type { Format } from '@/engine/types';
 import { useEditorStore } from '@/store/editorStore';
 import CanvasEditor from './CanvasEditor';
+import ScreenPrompt from './ScreenPrompt';
 import type { PlaybackEngine } from './usePlaybackEngine';
 
 // Multilingual projects only (loaded on demand, like the Languages tab).
@@ -179,11 +180,13 @@ export default function Stage({ engine, touch = false }: { engine: PlaybackEngin
         <div ref={frameRef} className="relative flex-none" style={{ width: size.width, height: size.height, transform: touch ? `translate(${pan.x}px, ${pan.y}px)` : undefined }}>
           {/* The canvas is clipped to rounded corners; the editing layer is
               not, so selection handles at the canvas edge stay reachable. */}
-          <div data-touch-exempt className={`absolute inset-0 overflow-hidden border border-white/10 shadow-[0_40px_90px_rgba(0,0,0,.6)] ${touch ? 'rounded-[16px]' : 'rounded-[22px]'}`}>
-            <canvas ref={canvasRef} className="block" />
-            {(project.localization?.languages.length ?? 0) > 1 && <LanguageSwitcher />}
-          </div>
-          <CanvasEditor engine={engine} W={FORMATS[project.format].w} H={FORMATS[project.format].h} cssScale={cssScale} touch={touch} />
+          <ScreenPrompt engine={engine} cssScale={cssScale}>
+            <div data-touch-exempt className={`absolute inset-0 overflow-hidden border border-white/10 shadow-[0_40px_90px_rgba(0,0,0,.6)] ${touch ? 'rounded-[16px]' : 'rounded-[22px]'}`}>
+              <canvas ref={canvasRef} className="block" />
+              {(project.localization?.languages.length ?? 0) > 1 && <LanguageSwitcher />}
+            </div>
+            <CanvasEditor engine={engine} W={FORMATS[project.format].w} H={FORMATS[project.format].h} cssScale={cssScale} touch={touch} />
+          </ScreenPrompt>
         </div>
       </div>
 

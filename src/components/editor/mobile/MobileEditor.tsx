@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { musicClip } from '@/engine/audio/clips';
 import { useEditorStore } from '@/store/editorStore';
 import AudioPanel from '../panels/AudioPanel';
+import FillScreensBanner from '../FillScreensBanner';
 import MusicDrawer from '../panels/MusicDrawer';
 import type { EditorTab } from '../EditorShell';
 import SaveStatusBadge from '../SaveStatusBadge';
@@ -436,7 +437,7 @@ function StripThumb({ entry }: { entry: SlideEntry }) {
       onClick={entry.onSelect}
       aria-label={`${entry.name}${entry.hidden ? ' (hidden)' : ''}`}
       aria-current={entry.selected}
-      className={`relative h-[60px] w-11 shrink-0 overflow-hidden rounded-[10px] border-2 ${entry.selected ? 'border-[#8b7dff]' : 'border-transparent'} ${entry.hidden ? 'opacity-40' : ''}`}
+      className={`relative h-[60px] w-11 shrink-0 overflow-hidden rounded-[10px] border-2 ${entry.selected ? 'border-[#8b7dff]' : entry.missing ? 'border-[#ffd166]/70' : 'border-transparent'} ${entry.hidden ? 'opacity-40' : ''}`}
       style={{ background: `linear-gradient(150deg, ${entry.colorA}, ${entry.colorB})` }}
     >
       {entry.thumb ? (
@@ -477,6 +478,7 @@ function MobileSlideList() {
   const projectId = useEditorStore((s) => s.projectId);
   return (
     <div className="grid gap-2 p-3">
+      <FillScreensBanner compact />
       {entries.map((e) => (
         <div key={e.key} className={`flex min-h-14 items-stretch overflow-hidden rounded-[12px] border ${e.selected ? 'border-[#8b7dff]/55 bg-[#5b4bff]/[.14]' : 'border-white/10 bg-white/[.03]'}`}>
           <button onClick={e.onSelect} className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-2 text-left">
@@ -485,6 +487,7 @@ function MobileSlideList() {
               <span className={`block truncate text-[14px] font-semibold ${e.hidden ? 'text-[#6d7484]' : 'text-[#f4f5f8]'}`}>{e.name}</span>
               <span className="block text-[12px] text-[#767e8d]">
                 {e.duration.toFixed(1)}s{e.hidden ? ' · hidden' : ''}
+                {e.missing && <span className="font-semibold text-[#ffd166]"> · needs screenshot</span>}
               </span>
             </span>
           </button>

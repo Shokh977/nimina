@@ -160,6 +160,7 @@ export default function TemplateWizard({ templateId, onClose }: { templateId: st
         <p className="mt-4 text-[12.5px] font-bold text-neutral-500 dark:text-neutral-400">
           {filledCount} of {slots.length} screenshots added
         </p>
+        <p className="mt-0.5 text-[12px] text-neutral-500 dark:text-neutral-400">Skip any you don&apos;t have yet — you can add or change every screenshot in the editor.</p>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {slots.map((slot) => (
             <label key={slot.key} className="block cursor-pointer">
