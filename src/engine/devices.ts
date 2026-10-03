@@ -247,6 +247,83 @@ function shadeForNormal(nx: number, ny: number, nz: number, dark: string, edge: 
   return mixHex(dark, edge, k);
 }
 
+/** Side buttons, as the flat drawDevice() lays them out (same positions,
+ * per model): which edge, where along it (fractions of PH, or of PW for the
+ * tablet's top edge). */
+const SIDE_BUTTONS: Partial<Record<string, Array<{ edge: 'left' | 'right' | 'top'; from: number; to: number }>>> = {
+  phone: [
+    { edge: 'left', from: -0.24, to: -0.17 },
+    { edge: 'left', from: -0.14, to: -0.07 },
+    { edge: 'right', from: -0.18, to: -0.07 },
+  ],
+  punch: [
+    { edge: 'right', from: -0.22, to: -0.1 },
+    { edge: 'right', from: -0.06, to: 0 },
+  ],
+  cam: [{ edge: 'top', from: 0.22, to: 0.34 }],
+};
+
+/** One raised button on the device's side band: a rounded profile (along
+ * the edge × across the thickness) extruded outward by `out`, each face
+ * shaded by its own normal. Drawn only when the side it sits on faces the
+ * camera — otherwise the body hides it. */
+function drawSideButton3d(ctx: CanvasRenderingContext2D, pose: Pose3D, edge: 'left' | 'right' | 'top', from: number, to: number, PW: number, PH: number, hz: number, dark: string, light: string): void {
+  const dir = edge === 'left' ? -1 : 1;
+  const mount: Point3 = edge === 'top' ? { x: 0, y: -1, z: 0 } : { x: dir, y: 0, z: 0 };
+  if (rotate3d(mount, pose.rx, pose.ry, pose.rz).z <= 0.02) return;
+  const out = PW * 0.013;
+  const half = hz * 0.42; // buttons sit in the middle of the frame's thickness
+  const len = to - from;
+  const span = edge === 'top' ? len * PW : len * PH;
+  const mid = edge === 'top' ? ((from + to) / 2) * PW : ((from + to) / 2) * PH;
+  // Rounded profile in (u along the edge, v across the thickness).
+  const prof = roundRectPoints3d(span, half * 2, half * 0.95, 0, 4).map((q) => ({ u: q.x + mid, v: q.y }));
+  const base = edge === 'top' ? -PH / 2 : (dir * PW) / 2;
+  const at = (q: { u: number; v: number }, t: number): Point3 => (edge === 'top' ? { x: q.u, y: base - t, z: q.v } : { x: base + dir * t, y: q.u, z: q.v });
+  const proj = (p: Point3) => xform3d(p, pose);
+  const shadeN = (n: Point3) => {
+    const r = rotate3d(n, pose.rx, pose.ry, pose.rz);
+    return { visible: r.z > 0, color: shadeForNormal(r.x, r.y, r.z, dark, light) };
+  };
+  // Extrusion walls.
+  const cu = mid;
+  for (let i = 0; i < prof.length; i++) {
+    const a = prof[i],
+      b = prof[(i + 1) % prof.length];
+    let nu = b.v - a.v,
+      nv = -(b.u - a.u);
+    if (nu * ((a.u + b.u) / 2 - cu) + nv * ((a.v + b.v) / 2) < 0) {
+      nu = -nu;
+      nv = -nv;
+    }
+    const n = edge === 'top' ? { x: nu, y: 0, z: nv } : { x: 0, y: nu, z: nv };
+    const { visible, color } = shadeN(n);
+    if (!visible) continue;
+    const pa = proj(at(a, 0)),
+      pb = proj(at(b, 0)),
+      pc = proj(at(b, out)),
+      pd = proj(at(a, out));
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.lineTo(pc.x, pc.y);
+    ctx.lineTo(pd.x, pd.y);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  // Outer face.
+  const cap = shadeN(mount);
+  if (cap.visible) {
+    pathFrom3d(
+      ctx,
+      prof.map((q) => proj(at(q, out))),
+    );
+    ctx.fillStyle = cap.color;
+    ctx.fill();
+  }
+}
+
 /** Projects a device-local point ring (z fixed) through the pose and
  * builds a ctx path from it — the 3D-renderer's equivalent of `rr()`,
  * used everywhere a flat rounded-rect/notch shape needs to become a
@@ -329,6 +406,14 @@ export function drawDevice3D(ctx: CanvasRenderingContext2D, img: ImageAsset | nu
     ctx.closePath();
     ctx.fillStyle = shadeForNormal(mid.x, mid.y, mid.z, colDark, fc.edge);
     ctx.fill();
+  }
+
+  // Volume/power buttons on the side band (the flat renderer's layout).
+  const buttons = SIDE_BUTTONS[m.cut === 'island' || m.cut === 'notch' ? 'phone' : m.cut];
+  if (buttons) {
+    const btnDark = shade(fc.btn, -0.35),
+      btnLight = shade(fc.btn, 0.35);
+    for (const b of buttons) drawSideButton3d(ctx, pose, b.edge, b.from, b.to, PW, PH, hz, btnDark, btnLight);
   }
 
   if (!facing) {
