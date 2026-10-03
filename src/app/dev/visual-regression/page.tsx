@@ -105,7 +105,7 @@ export default function VisualRegressionPage() {
         // back to MediaRecorder), decoded back from the resulting file —
         // exercises the exact color pipeline a user's download goes
         // through, not just the live preview.
-        const exportResult = await exportVideo(project, assets, null, { resolution: '720p' }, new AbortController().signal);
+        const exportResult = await exportVideo(project, assets, {}, { resolution: '720p' }, new AbortController().signal);
         const frameCanvas = await decodeExportFrame(exportResult.blob, fixture.sampleAtT);
         const exportChecks = fixture.samples.map((s) => checkSample(s, readPixel(frameCanvas, s.xFrac, s.yFrac), EXPORT_TOLERANCE_PAD));
 

@@ -5,7 +5,7 @@
  * the whole video once in real time while recording, since MediaRecorder
  * has no offline/faster-than-real-time mode.
  */
-import { getSfxEvents, playSfx, scheduleDucking } from '../audio';
+import { getSfxEvents, playableClips, playSfx, scheduleClip, type AudioBuffers } from '../audio';
 import { getTimeline, render } from '../render';
 import type { AssetMap, Project } from '../types';
 import { outputDimensions } from './resolution';
@@ -26,7 +26,7 @@ function pickMime(): string {
 export async function exportVideoMediaRecorder(
   project: Project,
   images: AssetMap,
-  musicBuffer: AudioBuffer | null,
+  audio: AudioBuffers,
   options: ExportOptions,
   signal: AbortSignal,
   onProgress?: (framesRendered: number, totalFrames: number) => void,
@@ -52,25 +52,28 @@ export async function exportVideoMediaRecorder(
 
   const stream = canvas.captureStream(30);
   const sfxEvents = getSfxEvents(project);
-  let audioSrc: AudioBufferSourceNode | null = null;
+  const clips = playableClips(project, audio);
+  const audioSrcs: AudioScheduledSourceNode[] = [];
   let audioCtx: AudioContext | null = null;
-  if (musicBuffer || sfxEvents.length) {
+  if (clips.length || sfxEvents.length) {
     audioCtx = new AudioContext();
     await audioCtx.resume();
     const dest = audioCtx.createMediaStreamDestination();
     const now = audioCtx.currentTime;
 
-    if (musicBuffer) {
-      audioSrc = audioCtx.createBufferSource();
-      audioSrc.buffer = musicBuffer;
-      audioSrc.loop = true;
-      const gain = audioCtx.createGain();
-      const fadeStart = now + Math.max(0, total - 1.2);
-      gain.gain.setValueAtTime(project.volume, now);
-      gain.gain.setValueAtTime(project.volume, fadeStart);
-      gain.gain.linearRampToValueAtTime(0.0001, now + total);
-      if (project.ducking && sfxEvents.length) scheduleDucking(gain, (t) => now + t, sfxEvents, project.volume, 0, total - 1.2);
-      audioSrc.connect(gain).connect(dest);
+    // A silent source for the whole video keeps the recorded audio track as
+    // long as the video when the music stops before the end.
+    const bed = audioCtx.createConstantSource();
+    bed.offset.value = 0;
+    bed.connect(dest);
+    bed.start(now);
+    bed.stop(now + total);
+    audioSrcs.push(bed);
+
+    const duckUnder = project.ducking ? sfxEvents : [];
+    for (const { clip, buffer } of clips) {
+      const src = scheduleClip(audioCtx, dest, clip, buffer, { total, from: 0, at: (t) => now + t, duckUnder });
+      if (src) audioSrcs.push(src);
     }
     if (sfxEvents.length) {
       const sfxGain = audioCtx.createGain();
@@ -101,7 +104,6 @@ export async function exportVideoMediaRecorder(
     recorder.onstop = () => resolve();
   });
   recorder.start(250);
-  audioSrc?.start();
   const t0 = performance.now();
   const totalFrames = Math.max(1, Math.ceil(total * 30));
   let canceled = false;
@@ -126,10 +128,12 @@ export async function exportVideoMediaRecorder(
   });
 
   recorder.stop();
-  try {
-    audioSrc?.stop();
-  } catch {
-    // already stopped
+  for (const src of audioSrcs) {
+    try {
+      src.stop();
+    } catch {
+      // already stopped
+    }
   }
   await done;
   stream.getTracks().forEach((t) => t.stop());

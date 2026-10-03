@@ -356,8 +356,6 @@ export const ECOMMERCE_TEMPLATE: TemplateDef = {
       // so it's a one-template flourish, not worth a dedicated effect.
       outro: { on: true, dur: 2.8, cta: strings.outroCta, button: 'Shop now', small: '', style: { transition: 'flash' } },
       quality: '1080',
-      music: null,
-      volume: 0.8,
       ducking: true,
       motionSpeed: 100,
       scenes,

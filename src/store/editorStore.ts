@@ -41,7 +41,9 @@ import type {
   StorySlide,
   TextSlide,
   CustomFontRef,
+  AudioClip,
 } from '@/engine/types';
+import { musicClip, newMusicClip } from '@/engine/audio/clips';
 import { newAssetId } from '@/lib/assetSrc';
 import { PLAN_LIMITS, type Plan } from '@/lib/plan';
 
@@ -50,7 +52,7 @@ const COMMIT_DEBOUNCE_MS = 450;
 
 export interface EditorAssets {
   images: AssetMap;
-  /** decoded Web Audio buffers, keyed by the same id as project.music?.assetId */
+  /** decoded Web Audio buffers, keyed by the audio clips' assetId */
   audio: Record<string, AudioBuffer>;
 }
 
@@ -119,10 +121,17 @@ interface EditorState {
   /* ---- icon / music assets ---- */
   setIcon: (assetId: string, image: ImageAsset) => void;
   clearIcon: () => void;
+  /** Puts a file on the music track: replaces the music clip's file
+   * (keeping its position, trim, volume and fades) or adds a new clip. */
   setMusic: (assetId: string, name: string, buffer: AudioBuffer, bpm?: number) => void;
   clearMusic: () => void;
-  setVolume: (v: number) => void;
+  updateAudioClip: (clipId: string, patch: Partial<Omit<AudioClip, 'id'>>) => void;
+  removeAudioClip: (clipId: string) => void;
   setDucking: (v: boolean) => void;
+  /** What the inspector shows instead of the tabs: an audio clip's settings,
+   * the "add music" browser, or nothing (the tabs). UI state, not undoable. */
+  audioSelection: string | 'add' | null;
+  selectAudio: (sel: string | 'add' | null) => void;
 
   /* ---- slides ---- */
   registerImage: (assetId: string, image: ImageAsset) => void;
@@ -238,6 +247,11 @@ function defaultSelection(project: Project): number | 'intro' | 'outro' | null {
 function withCustomFont(p: Project, ref: CustomFontRef): Project {
   const list = (p.customFonts ?? []).filter((f) => f.id !== ref.id);
   return { ...p, customFonts: [...list, { id: ref.id, family: ref.family, weight: ref.weight, ...(ref.italic ? { italic: true } : {}) }] };
+}
+
+function mapAudioClip(p: Project, clipId: string, fn: (c: AudioClip) => AudioClip): Project {
+  if (!p.audio) return p;
+  return { ...p, audio: { tracks: p.audio.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === clipId ? fn(c) : c)) })) } };
 }
 
 function mapSlide(project: Project, id: number, fn: (s: Slide) => Slide): Project {
@@ -396,7 +410,9 @@ export const useEditorStore = create<EditorState>((set, get) => {
     setLanguageFontScale: (locale, fontScale) => update((p) => mapLanguage(p, locale, (l) => ({ ...l, fontScale }))),
 
     selectedSceneId: defaultSelection(initialProject),
-    selectScene: (id) => set({ selectedSceneId: id }),
+    selectScene: (id) => set({ selectedSceneId: id, audioSelection: null }),
+    audioSelection: null,
+    selectAudio: (audioSelection) => set({ audioSelection }),
 
     loadProject: (project, projectId, assets) => {
       const normalized = normalizeProject(project);
@@ -409,6 +425,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         canUndo: false,
         canRedo: false,
         selectedSceneId: defaultSelection(normalized),
+        audioSelection: null,
         previewLocale: null,
       }));
     },
@@ -451,10 +468,35 @@ export const useEditorStore = create<EditorState>((set, get) => {
     clearIcon: () => update((p) => ({ ...p, iconAssetId: null })),
     setMusic: (assetId, name, buffer, bpm) => {
       set((s) => ({ assets: { ...s.assets, audio: { ...s.assets.audio, [assetId]: buffer } } }));
-      update((p) => ({ ...p, music: { assetId, name, bpm } }));
+      const current = musicClip(get().project);
+      const clipId = current?.id ?? `clip-${Date.now().toString(36)}`;
+      update((p) => {
+        if (current) return mapAudioClip(p, current.id, (c) => ({ ...c, assetId, name, bpm, sourceOffset: 0 }));
+        const tracks = p.audio?.tracks ?? [];
+        const track = tracks.find((t) => t.kind === 'music');
+        const clip = newMusicClip(clipId, assetId, name, bpm);
+        return {
+          ...p,
+          audio: { tracks: track ? tracks.map((t) => (t === track ? { ...t, clips: [...t.clips, clip] } : t)) : [...tracks, { id: 'music', kind: 'music', clips: [clip] }] },
+        };
+      });
+      set({ audioSelection: clipId });
     },
-    clearMusic: () => update((p) => ({ ...p, music: null })),
-    setVolume: (volume) => update((p) => ({ ...p, volume })),
+    clearMusic: () => {
+      const current = musicClip(get().project);
+      if (current) get().removeAudioClip(current.id);
+    },
+    updateAudioClip: (clipId, patch) => update((p) => mapAudioClip(p, clipId, (c) => ({ ...c, ...patch }))),
+    removeAudioClip: (clipId) => {
+      update((p) => {
+        const tracks = (p.audio?.tracks ?? []).map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== clipId) })).filter((t) => t.clips.length);
+        if (tracks.length) return { ...p, audio: { tracks } };
+        const next = { ...p };
+        delete next.audio;
+        return next;
+      });
+      if (get().audioSelection === clipId) set({ audioSelection: null });
+    },
     setDucking: (ducking) => update((p) => ({ ...p, ducking })),
 
     registerImage: (assetId, image) => {

@@ -40,8 +40,6 @@ function base(overrides: Partial<Project> = {}): Omit<Project, 'scenes'> {
     iconAssetId: null,
     outro: { on: true, dur: 3, cta: '', button: 'Download free', small: '', style: {} },
     quality: '1080',
-    music: null,
-    volume: 0.8,
     ducking: true,
     motionSpeed: 100,
     ...overrides,

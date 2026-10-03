@@ -80,7 +80,6 @@ export function useBatchExport() {
 
     const appSlug = slug(base.appName);
     const entries: Record<string, Uint8Array> = {};
-    const musicBuffer = base.music ? (assets.audio[base.music.assetId] ?? null) : null;
 
     for (const locale of locales) {
       if (controller.signal.aborted) {
@@ -102,7 +101,7 @@ export function useBatchExport() {
         for (const format of req.videoFormats) {
           if (controller.signal.aborted) throw abortError();
           patch(locale, { step: `Video ${format}` });
-          const outcome = await exportVideo({ ...project, format }, assets.images, musicBuffer, { resolution, watermark: limits.watermark }, controller.signal, (d, t) =>
+          const outcome = await exportVideo({ ...project, format }, assets.images, assets.audio, { resolution, watermark: limits.watermark }, controller.signal, (d, t) =>
             patch(locale, { progress: ((doneUnits + (d / t) * 100) / units) * 100 }),
           );
           langEntries[`${folder}/${appSlug}-${locale}-${format.replace(':', 'x')}.${outcome.ext}`] = new Uint8Array(await outcome.blob.arrayBuffer());

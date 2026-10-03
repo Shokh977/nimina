@@ -327,8 +327,6 @@ export const SAAS_TEMPLATE: TemplateDef = {
       iconAssetId: null,
       outro: { on: true, dur: 2.8, cta: strings.outroCta, button: 'Start free trial', small: 'No credit card required', style: {} },
       quality: '1080',
-      music: null,
-      volume: 0.8,
       ducking: true,
       motionSpeed: 100,
       scenes,

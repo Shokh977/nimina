@@ -456,8 +456,6 @@ export const FITNESS_TEMPLATE: TemplateDef = {
       iconAssetId: null,
       outro: { on: true, dur: 2.5, cta: strings.outroCta, button: 'Download free', small: strings.outroSmall, style: {} },
       quality: '1080',
-      music: null,
-      volume: 0.8,
       ducking: true,
       motionSpeed: 100,
       scenes,

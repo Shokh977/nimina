@@ -3,6 +3,7 @@
  * project starts from (mirrors legacy/promo-studio.html's initial `state`
  * object, minus its baked-in demo content).
  */
+import { migrateLegacyAudio } from './audio/clips';
 import { PRESETS } from './constants';
 import type { Project } from './types';
 
@@ -55,22 +56,21 @@ export function createDefaultProject(): Project {
     outro: { on: true, dur: 3, cta: '', button: 'Download free', small: '', style: {} },
     scenes: [],
     quality: '1080',
-    music: null,
-    volume: 0.8,
     ducking: true,
     motionSpeed: 100,
   };
 }
 
 /** Backfills fields added after a project may have been saved — `hidden`
- * on scenes, `motionSpeed` on the project — so the store's "Project is
+ * on scenes, `motionSpeed` on the project, the audio tracks that replaced
+ * the single `music` field — so the store's "Project is
  * always fully populated once loaded" invariant holds for every consumer,
  * without scattering `?? false`/`?? 100` fallbacks across the engine. Call
  * once at every load boundary (editorStore's loadProject, and wherever a
  * template/project is first hydrated server-side). */
 export function normalizeProject(p: Project): Project {
   return {
-    ...p,
+    ...migrateLegacyAudio(p),
     motionSpeed: p.motionSpeed ?? 100,
     scenes: p.scenes.map((s) => ({ ...s, hidden: s.hidden ?? false })),
   };

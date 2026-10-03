@@ -279,8 +279,6 @@ export function buildDemoProject(): { project: Project; assets: AssetMap } {
       style: { theme: '5', bgPattern: 'rays' },
     },
     quality: '1080',
-    music: null,
-    volume: 0.8,
     ducking: true,
     motionSpeed: 100,
     scenes: [

@@ -222,6 +222,45 @@ export interface CounterConfig {
  * device's own PW/PH (device-local pixels before drawScene's own S
  * scale), so `distance` is comparable to PW/PH, not canvas pixels. See
  * src/engine/pose3d.ts. */
+/* ---------- audio (timeline tracks) ---------- */
+
+/** One piece of audio on the timeline. All times are seconds of the
+ * finished video (not affected by motionSpeed). */
+export interface AudioClip {
+  id: string;
+  /** 'library:<file>' for a music-library track, otherwise the id of the
+   * user's own upload in the project folder. */
+  assetId: string;
+  name: string;
+  /** Known for library tracks; drives snap-to-beat. */
+  bpm?: number;
+  /** Where the clip begins on the timeline. */
+  start: number;
+  /** How long it plays; null = until the video ends (follows the video's
+   * length as slides are added or removed). */
+  duration: number | null;
+  /** Where in the audio file playback begins — e.g. skipping a slow intro. */
+  sourceOffset: number;
+  /** Repeats the file from sourceOffset when it ends before the clip does. */
+  loop: boolean;
+  /** 0-1. */
+  volume: number;
+  fadeIn: number;
+  fadeOut: number;
+}
+
+export interface AudioTrack {
+  id: string;
+  /** Only 'music' exists today; voice-over/sfx tracks would add kinds. */
+  kind: 'music';
+  muted?: boolean;
+  clips: AudioClip[];
+}
+
+export interface ProjectAudio {
+  tracks: AudioTrack[];
+}
+
 export interface Pose3D {
   rx: number;
   ry: number;
@@ -482,11 +521,16 @@ export interface Project {
   quality: Quality;
   /** Audio is not consumed by render() — it belongs to the playback/export
    * layer built on top of the engine (see src/engine/audio/). Kept here so
-   * Project is a complete, persistable model. `bpm` is known for music
-   * library tracks (drives snap-to-beat in the story editor); absent for a
-   * user's own uploaded file unless they set it. */
-  music: { assetId: string; name: string; bpm?: number } | null;
-  volume: number;
+   * Project is a complete, persistable model. Tracks of clips, so voice-over
+   * or sound-effect tracks can be added later; the editor currently makes
+   * one music track with one clip (src/engine/audio/clips.ts). Absent on a
+   * project without audio. */
+  audio?: ProjectAudio;
+  /** @deprecated Pre-timeline single music track. normalizeProject()
+   * converts it into `audio` and drops it — nothing else reads it. */
+  music?: { assetId: string; name: string; bpm?: number } | null;
+  /** @deprecated The old music volume; moved onto the clip by normalizeProject(). */
+  volume?: number;
   /** Whether background music ducks (briefly lowers) under story-slide
    * sound effects during preview and export. */
   ducking: boolean;

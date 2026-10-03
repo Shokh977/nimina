@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { resolveStyle } from '@/engine/render';
 import type { Project, Segment } from '@/engine/types';
 import { useEditorStore } from '@/store/editorStore';
+import AudioLane, { AUDIO_LANE_H } from './AudioLane';
 
 function formatDur(s: number): string {
   return `${s.toFixed(1)}s`;
@@ -19,6 +20,8 @@ const CLIP_GAP = 4; // px of visual gap at each clip's right edge
 const DRAG_THRESHOLD = 4; // px before a press becomes a drag
 const ZOOM_STEPS = [1, 2, 4, 8] as const;
 const ZOOM_KEY = 'promo-studio:timeline-zoom';
+const SLIDES_H = 58;
+const LANE_GAP = 6;
 
 type Drag =
   | { mode: 'press'; x0: number; seg: number | null }
@@ -37,6 +40,8 @@ type Drag =
  *  - drag a clip's right edge: change its duration (0.1s steps)
  *  - drag a slide sideways: reorder it among the slides
  *  - ←/→ seek 0.1s (shift: 1s) when the strip has focus
+ *
+ * Under the slides is the audio row (AudioLane.tsx), on the same scale.
  *
  * Zoomable: at Fit the whole video fits the strip; at 2×/4×/8× it scrolls,
  * and the playhead is kept in view during playback.
@@ -216,8 +221,8 @@ export default function Timeline({ project, segments, total, t, onSeek }: { proj
           aria-valuemax={total}
           aria-valuenow={Number(t.toFixed(1))}
           aria-valuetext={`${formatTime(t)} of ${formatTime(total)}`}
-          style={{ width: zoomed ? trackWidth : '100%' }}
-          className={`relative h-[58px] touch-none select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff] ${drag?.mode === 'scrub' ? 'cursor-ew-resize' : 'cursor-pointer'}`}
+          style={{ width: zoomed ? trackWidth : '100%', height: SLIDES_H + LANE_GAP + AUDIO_LANE_H }}
+          className={`relative touch-none select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8b7dff] ${drag?.mode === 'scrub' ? 'cursor-ew-resize' : 'cursor-pointer'}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -243,6 +248,7 @@ export default function Timeline({ project, segments, total, t, onSeek }: { proj
                   style={{
                     left: seg.start * pxPerSecond,
                     width: Math.max(2, seg.dur * pxPerSecond - CLIP_GAP),
+                    height: SLIDES_H,
                     background: isScene ? `linear-gradient(150deg, ${style.colors.a}, ${style.colors.b})` : 'rgba(255,255,255,.05)',
                     opacity: active || dragging ? 1 : isScene ? 0.62 : 0.85,
                     borderColor: active ? '#8b7dff' : 'rgba(255,255,255,.08)',
@@ -250,7 +256,7 @@ export default function Timeline({ project, segments, total, t, onSeek }: { proj
                     zIndex: dragging ? 5 : undefined,
                     boxShadow: dragging ? '0 12px 30px rgba(0,0,0,.5)' : undefined,
                   }}
-                  className={`absolute top-0 bottom-0 flex min-w-0 flex-col justify-end overflow-hidden rounded-[10px] border-2 px-2.5 py-1.5 ${isScene ? '' : 'border-dashed'} ${dragging ? 'cursor-grabbing' : ''}`}
+                  className={`absolute top-0 flex min-w-0 flex-col justify-end overflow-hidden rounded-[10px] border-2 px-2.5 py-1.5 ${isScene ? '' : 'border-dashed'} ${dragging ? 'cursor-grabbing' : ''}`}
                 >
                   <span className="truncate text-[11.5px] font-semibold text-white" style={{ textShadow: '0 1px 3px rgba(0,0,0,.5)' }}>
                     {seg.label}
@@ -273,8 +279,10 @@ export default function Timeline({ project, segments, total, t, onSeek }: { proj
               );
             })}
 
+          {pxPerSecond > 0 && <AudioLane project={project} total={total} pxPerSecond={pxPerSecond} segments={segments} t={t} />}
+
           {drag?.mode === 'reorder' && (
-            <div className="pointer-events-none absolute -top-1 -bottom-1 z-10 w-[3px] -translate-x-1/2 rounded-full bg-[#8b7dff]" style={{ left: drag.markerT * pxPerSecond - CLIP_GAP / 2 }} />
+            <div className="pointer-events-none absolute -top-1 z-10 w-[3px] -translate-x-1/2 rounded-full bg-[#8b7dff]" style={{ left: drag.markerT * pxPerSecond - CLIP_GAP / 2, height: SLIDES_H + 8 }} />
           )}
 
           {/* Playhead: the line is exactly at t on the same scale as the clips; the knob is draggable. */}

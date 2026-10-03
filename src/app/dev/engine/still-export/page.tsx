@@ -52,7 +52,7 @@ export default function StillExportHarness() {
         const { project, assets } = useEditorStore.getState();
         const s = project.scenes[i];
         const p = { ...project, format, intro: { ...project.intro, on: false }, outro: { ...project.outro, on: false }, scenes: project.scenes.map((x) => ({ ...x, hidden: x.id !== s.id })) };
-        const out = await exportVideo(p, assets.images, null, { resolution: '1080p' }, new AbortController().signal);
+        const out = await exportVideo(p, assets.images, {}, { resolution: '1080p' }, new AbortController().signal);
         const video = document.createElement('video');
         video.src = out.url;
         video.muted = true;

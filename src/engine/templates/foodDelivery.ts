@@ -418,8 +418,6 @@ export const FOOD_DELIVERY_TEMPLATE: TemplateDef = {
       iconAssetId: null,
       outro: { on: true, dur: 3, cta: strings.outroCta, button: 'Order now', small: strings.outroSmall, style: {} },
       quality: '1080',
-      music: null,
-      volume: 0.8,
       ducking: true,
       motionSpeed: 100,
       scenes,

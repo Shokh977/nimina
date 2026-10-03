@@ -432,8 +432,6 @@ export function buildStoryDemoProject(): { project: Project; assets: AssetMap } 
     iconAssetId: 'appicon',
     outro: { on: false, dur: 3, cta: '', button: '', small: '', style: {} },
     quality: '1080',
-    music: null,
-    volume: 0.8,
     ducking: true,
     motionSpeed: 100,
     scenes: [storySlide],

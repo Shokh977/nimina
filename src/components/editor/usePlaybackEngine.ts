@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { getSfxEvents, playSfx, scheduleDucking, type SfxEvent } from '@/engine/audio';
+import { getSfxEvents, playableClips, playSfx, scheduleClip, type SfxEvent } from '@/engine/audio';
 import { FORMATS } from '@/engine/constants';
 import { withElementCollector, type ElementReport } from '@/engine/elements';
 import { customFontsInUse } from '@/engine/customFonts';
@@ -123,9 +123,21 @@ export function usePlaybackEngine(): PlaybackEngine {
   const masterGainRef = useRef<GainNode | null>(null);
   const musicGainRef = useRef<GainNode | null>(null);
   const sfxGainRef = useRef<GainNode | null>(null);
-  const musicSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const clipSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const scheduledAtProjectTRef = useRef(0);
   const lastRestartWallRef = useRef(0);
+
+  const stopClipSources = useCallback(() => {
+    for (const src of clipSourcesRef.current) {
+      try {
+        src.stop();
+      } catch {
+        // already stopped
+      }
+      src.disconnect();
+    }
+    clipSourcesRef.current = [];
+  }, []);
 
   const ensureAudioGraph = useCallback((): AudioContext => {
     if (audioCtxRef.current) {
@@ -158,32 +170,20 @@ export function usePlaybackEngine(): PlaybackEngine {
     master.disconnect();
     master.connect(ctx.destination);
 
-    try {
-      musicSourceRef.current?.stop();
-    } catch {
-      // already stopped
-    }
-    musicSourceRef.current = null;
-    music.gain.cancelScheduledValues(ctx.currentTime);
+    stopClipSources();
     sfx.gain.cancelScheduledValues(ctx.currentTime);
 
     const proj = projectRef.current;
     const dur = getTimeline(proj).total;
     const events: SfxEvent[] = getSfxEvents(proj).filter((e) => e.time >= t);
 
-    const musicBuffer = proj.music ? (assetsRef.current.audio[proj.music.assetId] ?? null) : null;
-    if (musicBuffer && musicBuffer.duration > 0) {
-      const src = ctx.createBufferSource();
-      src.buffer = musicBuffer;
-      src.loop = true;
-      src.connect(music);
-      const offset = t % musicBuffer.duration;
-      src.start(ctx.currentTime, offset);
-      musicSourceRef.current = src;
-      music.gain.setValueAtTime(proj.volume, ctx.currentTime);
-      if (proj.ducking && events.length) {
-        scheduleDucking(music, (pt) => ctx.currentTime + (pt - t), events, proj.volume, t, dur);
-      }
+    // Every timeline clip, from the playhead on — the same scheduling the
+    // export uses (src/engine/audio/clips.ts).
+    const now = ctx.currentTime;
+    const duckUnder = proj.ducking ? events : [];
+    for (const { clip, buffer } of playableClips(proj, assetsRef.current.audio)) {
+      const src = scheduleClip(ctx, music, clip, buffer, { total: dur, from: t, at: (pt) => now + (pt - t), duckUnder });
+      if (src) clipSourcesRef.current.push(src);
     }
 
     for (const e of events) {
@@ -193,20 +193,27 @@ export function usePlaybackEngine(): PlaybackEngine {
 
     scheduledAtProjectTRef.current = t;
     lastRestartWallRef.current = performance.now();
-  }, [ensureAudioGraph]);
+  }, [ensureAudioGraph, stopClipSources]);
 
   const stopAudio = useCallback(() => {
     masterGainRef.current?.disconnect();
-    try {
-      musicSourceRef.current?.stop();
-    } catch {
-      // already stopped
-    }
-    musicSourceRef.current = null;
-  }, []);
+    stopClipSources();
+  }, [stopClipSources]);
 
   // Stop and release audio on unmount.
   useEffect(() => stopAudio, [stopAudio]);
+
+  // Editing audio while it plays (dragging a clip, a fade, the volume
+  // slider, a file finishing loading) is heard straight away: reschedule
+  // from the playhead, debounced so a drag doesn't restart it every frame.
+  const audioSig = JSON.stringify([project.audio ?? null, project.ducking]);
+  useEffect(() => {
+    if (!playingRef.current) return;
+    const id = setTimeout(() => {
+      if (playingRef.current) startAudioFrom(tRef.current);
+    }, 60);
+    return () => clearTimeout(id);
+  }, [audioSig, assets.audio, startAudioFrom]);
 
   // Canvas sizing is measured, not guessed — Stage's ResizeObserver calls
   // this with the actual available CSS box (see Stage.tsx's clamp/cap

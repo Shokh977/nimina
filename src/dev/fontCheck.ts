@@ -228,7 +228,7 @@ export async function runFontChecks(): Promise<FontCheckResult[]> {
     const big = W * 0.12; // drawTextSlide's 9:16 headline size
     // Export first: exportVideo awaits the project's fonts itself
     // (ensureProjectFonts, script font included) — part of what's checked.
-    const exported = await exportVideo(project, {}, null, { resolution: '720p' }, new AbortController().signal);
+    const exported = await exportVideo(project, {}, {}, { resolution: '720p' }, new AbortController().signal);
     const frame = await decodeFrame(exported.blob, SAMPLE_T);
     const exportScale = frame.width / W;
 

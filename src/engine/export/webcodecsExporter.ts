@@ -7,7 +7,7 @@
  */
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from 'mediabunny';
 
-import { getSfxEvents, renderProjectAudio } from '../audio';
+import { getSfxEvents, playableClips, renderProjectAudio, type AudioBuffers } from '../audio';
 import { getTimeline, render } from '../render';
 import type { AssetMap, Project } from '../types';
 import { outputDimensions } from './resolution';
@@ -35,7 +35,7 @@ function nextFrame(): Promise<void> {
 export async function exportVideoWebCodecs(
   project: Project,
   images: AssetMap,
-  musicBuffer: AudioBuffer | null,
+  audio: AudioBuffers,
   options: ExportOptions,
   signal: AbortSignal,
   onProgress?: (framesRendered: number, totalFrames: number) => void,
@@ -62,7 +62,7 @@ export async function exportVideoWebCodecs(
   output.addVideoTrack(videoSource, { frameRate: fps });
 
   const sfxEvents = getSfxEvents(project);
-  const hasAudio = !!musicBuffer || sfxEvents.length > 0;
+  const hasAudio = playableClips(project, audio).length > 0 || sfxEvents.length > 0;
   let audioSource: AudioBufferSource | null = null;
   if (hasAudio) {
     audioSource = new AudioBufferSource({ codec: 'aac', quality: new Quality({ bitrate: AUDIO_BITRATE }) });
@@ -86,7 +86,7 @@ export async function exportVideoWebCodecs(
 
     if (audioSource) {
       checkAbort(signal);
-      const rendered = await renderProjectAudio({ totalSeconds: total, musicBuffer, volume: project.volume, ducking: project.ducking, sfxEvents });
+      const rendered = await renderProjectAudio({ totalSeconds: total, project, buffers: audio, sfxEvents });
       if (rendered) await audioSource.add(rendered);
       audioSource.close();
     }

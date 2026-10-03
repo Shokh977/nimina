@@ -737,12 +737,36 @@ enforced by NOT NULL/CHECK constraints (migration 0022): we redistribute
 these files. Tracks can be deactivated (hidden from users, still playable
 in projects that use them), reordered, made free/Pro, or deleted.
 
-Editor: Motion → Music has Library (mood/genre filters, waveform preview;
-Pro-only tracks are greyed with an upgrade prompt for free users, who can
-still preview) and Upload your own. A picked library track becomes
-`project.music` (`library:<path>`) with its decoded buffer, so preview and
-export (loop, fade-out, ducking) treat it exactly like an upload. Like the
-other plan gates this is enforced in the browser (the files are public).
+Editor: the music browser (`MusicBrowser.tsx`, opened from the timeline's
+"＋ Add music" or Replace) has Library (mood/genre filters, waveform
+preview; Pro-only tracks are greyed with an upgrade prompt for free users,
+who can still preview) and Upload your own. A picked library track becomes
+a clip with assetId `library:<path>` and its decoded buffer, so preview and
+export treat it exactly like an upload. Like the other plan gates this is
+enforced in the browser (the files are public).
+
+## Timeline audio
+
+Audio is `project.audio.tracks[].clips[]` (`src/engine/types.ts`): each clip
+has its timeline `start`, `duration` (null = to the end of the video),
+`sourceOffset` (where in the song it begins), `loop`, `volume`, `fadeIn`,
+`fadeOut`. Tracks hold several clips and only `kind: 'music'` exists, so
+voice-over/SFX tracks can be added without a format change; the editor
+currently makes one music track with one clip. `normalizeProject` converts
+the old `music` + `volume` fields into that clip (0 → end, looping, 1.2 s
+fade-out — proven sample-identical to the old mixdown, ducking included).
+`scheduleClip()` (`src/engine/audio/clips.ts`) is the only place a clip is
+turned into Web Audio nodes — live preview, the WebCodecs offline mix and
+the MediaRecorder graph all use it; `exportVideo` takes the whole
+`assets.audio` map. Ducking (project-level `ducking`) runs on its own gain
+node under the clip's envelope.
+
+UI: the timeline's audio row (`AudioLane.tsx`: drag the clip = which part of
+the song plays, edges = trim with snapping to slide boundaries/playhead,
+top dots = fades, Delete removes); selecting it swaps the inspector for
+`AudioPanel.tsx` (the same values as sliders, plus loop, ducking, Replace).
+Store: `audioSelection`, `setMusic`, `updateAudioClip`, `removeAudioClip`.
+On phones the slide strip has a ♪ chip that opens the panel in the sheet.
 `scripts/seed-music-library.ts` (re)creates the procedural placeholder
 tracks in the same MP3 format.
 

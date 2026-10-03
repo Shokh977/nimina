@@ -375,8 +375,6 @@ export const FINANCE_TEMPLATE: TemplateDef = {
       // site's placeholder legal pages in CLAUDE.md.
       outro: { on: true, dur: 3, cta: strings.outroCta, button: 'Get started', small: 'Bank-level security', style: {} },
       quality: '1080',
-      music: null,
-      volume: 0.8,
       ducking: true,
       motionSpeed: 100,
       scenes,

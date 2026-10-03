@@ -38,7 +38,7 @@ export default function RenderPreviewsPage() {
       ] as const) {
         try {
           const { project } = def.build({ variant: 'short' });
-          const result = await exportVideo({ ...project, format: fmt }, assets, null, { resolution: '1080p' }, new AbortController().signal);
+          const result = await exportVideo({ ...project, format: fmt }, assets, {}, { resolution: '1080p' }, new AbortController().signal);
           const buf = await result.blob.arrayBuffer();
           let binary = '';
           const bytes = new Uint8Array(buf);

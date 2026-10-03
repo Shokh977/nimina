@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { allAudioClips } from '@/engine/audio/clips';
 import { FORMATS } from '@/engine/constants';
+import { normalizeProject } from '@/engine/project';
 import { render } from '@/engine/render';
 import type { Project } from '@/engine/types';
 import { loadImageFromUrl } from '@/lib/assetSrc';
@@ -101,10 +103,12 @@ export function usePersistence(projectId: string, initialProject: Project): Save
       });
       if (initialProject.iconAssetId) imageIds.add(initialProject.iconAssetId);
 
-      const ownMusicId = initialProject.music && !initialProject.music.assetId.startsWith('library:') ? initialProject.music.assetId : null;
+      // Audio clips (normalizeProject turns a pre-timeline `music` field into one).
+      const audioIds = [...new Set(allAudioClips(normalizeProject(initialProject)).map((c) => c.assetId))];
+      const ownAudioIds = audioIds.filter((id) => !id.startsWith('library:'));
       let urls: Record<string, string> = {};
       try {
-        urls = await getSignedAssetUrls(projectId, [...imageIds, ...(ownMusicId ? [ownMusicId] : [])]);
+        urls = await getSignedAssetUrls(projectId, [...imageIds, ...ownAudioIds]);
       } catch (err) {
         console.error('[persistence] failed to sign asset URLs', err);
       }
@@ -122,27 +126,27 @@ export function usePersistence(projectId: string, initialProject: Project): Save
         }),
       );
 
-      if (initialProject.music) {
-        const musicAssetId = initialProject.music.assetId;
-        try {
-          // Library tracks (see MotionPanel's onPickLibraryTrack) are
-          // stored with a 'library:<path>' id and live in the public
-          // bucket; a user's own upload lives in their private project
-          // folder and needs a signed URL.
-          const url = musicAssetId.startsWith('library:') ? getMusicLibraryUrl(musicAssetId.slice('library:'.length)) : urls[musicAssetId];
-          if (!url) throw new Error('no URL for the music file');
-          const res = await fetch(url);
-          const arrayBuffer = await res.arrayBuffer();
-          const audioCtx = new AudioContext();
-          const buffer = await audioCtx.decodeAudioData(arrayBuffer);
-          await audioCtx.close();
-          if (!cancelled) {
-            useEditorStore.setState((s) => ({ assets: { ...s.assets, audio: { ...s.assets.audio, [musicAssetId]: buffer } } }));
+      await Promise.all(
+        audioIds.map(async (assetId) => {
+          try {
+            // Library tracks are stored with a 'library:<path>' id and live
+            // in the public bucket; a user's own upload lives in their
+            // private project folder and needs a signed URL.
+            const url = assetId.startsWith('library:') ? getMusicLibraryUrl(assetId.slice('library:'.length)) : urls[assetId];
+            if (!url) throw new Error('no URL for the audio file');
+            const res = await fetch(url);
+            const arrayBuffer = await res.arrayBuffer();
+            const audioCtx = new AudioContext();
+            const buffer = await audioCtx.decodeAudioData(arrayBuffer);
+            await audioCtx.close();
+            if (!cancelled) {
+              useEditorStore.setState((s) => ({ assets: { ...s.assets, audio: { ...s.assets.audio, [assetId]: buffer } } }));
+            }
+          } catch (err) {
+            console.error('[persistence] failed to load audio asset', assetId, err);
           }
-        } catch (err) {
-          console.error('[persistence] failed to load music asset', err);
-        }
-      }
+        }),
+      );
 
       if (!cancelled) {
         setStatus('saved');

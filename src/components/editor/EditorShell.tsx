@@ -20,6 +20,7 @@ import { usePersistence, type SaveStatus } from './usePersistence';
 import { usePlaybackEngine } from './usePlaybackEngine';
 import { useTemplatePersistence } from './useTemplatePersistence';
 import AiDirectorPanel from './panels/AiDirectorPanel';
+import AudioPanel from './panels/AudioPanel';
 import ExportPanel from './panels/ExportPanel';
 import LookPanel from './panels/LookPanel';
 import MotionPanel from './panels/MotionPanel';
@@ -186,6 +187,7 @@ export function EditorShellBody({
   panel: React.ReactNode;
 }) {
   const engine = usePlaybackEngine();
+  const audioSelection = useEditorStore((s) => s.audioSelection);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
 
@@ -276,12 +278,21 @@ export function EditorShellBody({
           <ResizeHandle label="Resize the inspector" onDragStart={onInspectorDragStart} onDrag={onInspectorDrag} />
 
           <section className="flex min-h-0 min-w-0 shrink-0 flex-col" style={{ width: inspectorWidth }}>
-            <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/[.07] p-2 pb-0">
-              {tabs.map((t) => (
-                <TabButton key={t.id} active={activeTab === t.id} label={t.label} onClick={() => onTabChange(t.id)} />
-              ))}
-            </div>
-            <div className="min-w-0 flex-1 overflow-y-auto p-4">{panel}</div>
+            {audioSelection !== null ? (
+              // A selected audio clip (or "Add music") takes the inspector over, like a selected element in Canva.
+              <div className="min-w-0 flex-1 overflow-y-auto p-4">
+                <AudioPanel />
+              </div>
+            ) : (
+              <>
+                <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/[.07] p-2 pb-0">
+                  {tabs.map((t) => (
+                    <TabButton key={t.id} active={activeTab === t.id} label={t.label} onClick={() => onTabChange(t.id)} />
+                  ))}
+                </div>
+                <div className="min-w-0 flex-1 overflow-y-auto p-4">{panel}</div>
+              </>
+            )}
           </section>
         </div>
       </div>

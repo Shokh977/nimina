@@ -1,4 +1,5 @@
 import { ensureProjectFonts } from '../fonts';
+import { playableClips, type AudioBuffers } from '../audio/clips';
 import type { AssetMap, Project } from '../types';
 import { exportVideoMediaRecorder } from './mediaRecorderExporter';
 import { outputDimensions } from './resolution';
@@ -46,7 +47,7 @@ function isAbortError(err: unknown): err is DOMException {
 export async function exportVideo(
   project: Project,
   images: AssetMap,
-  musicBuffer: AudioBuffer | null,
+  audio: AudioBuffers,
   options: ExportOptions,
   signal: AbortSignal,
   onProgress?: (framesRendered: number, totalFrames: number) => void,
@@ -54,27 +55,28 @@ export async function exportVideo(
   const { width, height } = outputDimensions(project, options.resolution);
   const fps = options.fps ?? 30;
   await ensureProjectFonts(project);
+  const firstBuffer = playableClips(project, audio)[0]?.buffer;
 
   const webCodecsOk = await supportsWebCodecsExport({
     width,
     height,
     fps,
-    needsAudio: !!musicBuffer,
-    audioChannels: musicBuffer?.numberOfChannels,
-    audioSampleRate: musicBuffer?.sampleRate,
+    needsAudio: !!firstBuffer,
+    audioChannels: firstBuffer ? Math.max(2, firstBuffer.numberOfChannels) : undefined,
+    audioSampleRate: firstBuffer?.sampleRate,
   });
 
   if (!webCodecsOk) {
-    const result = await exportVideoMediaRecorder(project, images, musicBuffer, options, signal, onProgress);
+    const result = await exportVideoMediaRecorder(project, images, audio, options, signal, onProgress);
     return { ...result, fallbackReason: "This browser doesn't support WebCodecs export (H.264/AAC), so a real-time recording was used instead." };
   }
 
   try {
-    return await exportVideoWebCodecs(project, images, musicBuffer, options, signal, onProgress);
+    return await exportVideoWebCodecs(project, images, audio, options, signal, onProgress);
   } catch (err) {
     if (isAbortError(err)) throw err;
     const message = err instanceof Error ? err.message : String(err);
-    const result = await exportVideoMediaRecorder(project, images, musicBuffer, options, signal, onProgress);
+    const result = await exportVideoMediaRecorder(project, images, audio, options, signal, onProgress);
     return { ...result, fallbackReason: `The fast export failed (${message}), so a real-time recording was used instead.` };
   }
 }

@@ -1,48 +1,42 @@
 /**
- * Offline audio mixdown for export — renders background music (looped,
- * volume-controlled, faded out at the end, optionally ducked under sound
- * effects) plus every scheduled SFX event into one `AudioBuffer`, ready to
- * hand to the video exporter's audio track. Runs identically for the
- * WebCodecs exporter (which just needs the finished buffer) — the
+ * Offline audio mixdown for export — renders every audible timeline clip
+ * (src/engine/audio/clips.ts: position, trim, loop, volume, fades, ducked
+ * under sound effects) plus every scheduled SFX event into one
+ * `AudioBuffer`, ready to hand to the video exporter's audio track. Used by
+ * the WebCodecs exporter (which just needs the finished buffer) — the
  * MediaRecorder fallback instead builds an equivalent *live* graph (see
  * src/engine/export/mediaRecorderExporter.ts) since it can't render offline.
  */
-import { scheduleDucking } from './music';
+import { playableClips, scheduleClip, type AudioBuffers } from './clips';
 import { playSfx } from './synth';
 import type { SfxEvent } from './events';
+import type { Project } from '../types';
 
 export interface MixOptions {
   totalSeconds: number;
-  musicBuffer: AudioBuffer | null;
-  volume: number;
-  ducking: boolean;
+  project: Project;
+  buffers: AudioBuffers;
   sfxEvents: SfxEvent[];
-  fadeSeconds?: number;
 }
 
 export async function renderProjectAudio(opts: MixOptions): Promise<AudioBuffer | null> {
-  const { totalSeconds, musicBuffer, volume, ducking, sfxEvents, fadeSeconds = 1.2 } = opts;
-  if (!musicBuffer && sfxEvents.length === 0) return null;
+  const { totalSeconds, project, buffers, sfxEvents } = opts;
+  const clips = playableClips(project, buffers);
+  if (!clips.length && sfxEvents.length === 0) return null;
 
-  const sampleRate = musicBuffer?.sampleRate ?? 44100;
-  const channels = musicBuffer?.numberOfChannels ?? 2;
+  const sampleRate = clips[0]?.buffer.sampleRate ?? 44100;
+  const channels = Math.max(2, ...clips.map((c) => c.buffer.numberOfChannels));
   const length = Math.max(1, Math.ceil(totalSeconds * sampleRate));
   const ctx = new OfflineAudioContext(channels, length, sampleRate);
 
-  if (musicBuffer) {
-    const src = ctx.createBufferSource();
-    src.buffer = musicBuffer;
-    src.loop = true;
-    const musicGain = ctx.createGain();
-    src.connect(musicGain).connect(ctx.destination);
-    src.start(0);
-
-    const fadeStart = Math.max(0, totalSeconds - fadeSeconds);
-    musicGain.gain.setValueAtTime(volume, 0);
-    musicGain.gain.setValueAtTime(volume, fadeStart);
-    musicGain.gain.linearRampToValueAtTime(0.0001, totalSeconds);
-    if (ducking && sfxEvents.length) scheduleDucking(musicGain, (t) => t, sfxEvents, volume, 0, fadeStart);
-  }
+  const duckUnder = project.ducking ? sfxEvents : [];
+  for (const { clip, buffer } of clips)
+    scheduleClip(ctx, ctx.destination, clip, buffer, {
+      total: totalSeconds,
+      from: 0,
+      at: (t) => t,
+      duckUnder,
+    });
 
   if (sfxEvents.length) {
     const sfxGain = ctx.createGain();

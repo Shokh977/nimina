@@ -327,8 +327,6 @@ export const PRODUCTIVITY_TEMPLATE: TemplateDef = {
       iconAssetId: null,
       outro: { on: true, dur: 2.6, cta: strings.outroCta, button: 'Get started', small: '', style: {} },
       quality: '1080',
-      music: null,
-      volume: 0.8,
       ducking: true,
       motionSpeed: 100,
       scenes,

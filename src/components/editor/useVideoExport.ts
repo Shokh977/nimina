@@ -40,7 +40,6 @@ export function useVideoExport() {
     // language, or the project as-is when it has no other languages.
     const { assets, plan, previewLocale } = useEditorStore.getState();
     const project = localizeProject(useEditorStore.getState().project, previewLocale);
-    const musicBuffer = project.music ? (assets.audio[project.music.assetId] ?? null) : null;
 
     // Enforced here (not just disabled in the UI) as a last line of
     // defense — export runs entirely client-side, so this can't be a true
@@ -61,7 +60,7 @@ export function useVideoExport() {
       if (controller.signal.aborted) break;
       setResults((prev) => prev.map((r) => (r.format === format ? { ...r, status: 'rendering' } : r)));
       try {
-        const outcome = await exportVideo({ ...project, format }, assets.images, musicBuffer, { resolution, watermark: !isPro(plan) }, controller.signal, (done, total) => {
+        const outcome = await exportVideo({ ...project, format }, assets.images, assets.audio, { resolution, watermark: !isPro(plan) }, controller.signal, (done, total) => {
           const progress = Math.min(100, (done / total) * 100);
           setResults((prev) => prev.map((r) => (r.format === format ? { ...r, progress } : r)));
         });

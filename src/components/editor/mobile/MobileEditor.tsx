@@ -8,7 +8,9 @@ import { FORMATS } from '@/engine/constants';
 import type { Format } from '@/engine/types';
 import StorageMeter from '@/components/storage/StorageMeter';
 import { createClient } from '@/lib/supabase/client';
+import { musicClip } from '@/engine/audio/clips';
 import { useEditorStore } from '@/store/editorStore';
+import AudioPanel from '../panels/AudioPanel';
 import type { EditorTab } from '../EditorShell';
 import SaveStatusBadge from '../SaveStatusBadge';
 import Stage from '../Stage';
@@ -72,19 +74,42 @@ export default function MobileEditor({
   const primary = tabs.filter((t) => !t.secondary);
   const secondary = tabs.filter((t) => t.secondary);
 
+  const audioSelection = useEditorStore((s) => s.audioSelection);
+  const selectAudio = useEditorStore((s) => s.selectAudio);
+  // Selecting music (the strip's ♪ chip, or Motion's music row) opens its settings as a section.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- follows the store's selection
+    if (audioSelection !== null) setSection('audio');
+    else setSection((s) => (s === 'audio' ? null : s));
+  }, [audioSelection]);
+
   const open = (s: Section) => {
-    if (s !== 'slides') onTabChange(s);
+    if (s !== 'slides' && s !== 'audio') onTabChange(s);
+    if (s !== 'audio') selectAudio(null);
     setSection(s);
   };
   const onTabBar = (s: Section) => {
     // Portrait: tapping the open section's tab closes the sheet.
-    if (!landscape && section === s) setSection(null);
+    if (!landscape && section === s) closeSection();
     else open(s);
   };
   // Landscape always shows a section.
   const shown: Section | null = landscape ? (section ?? activeTab) : section;
-  const sectionLabel = shown === 'slides' ? 'Slides' : (tabs.find((t) => t.id === shown)?.label ?? '');
-  const sectionBody = shown === 'slides' ? <MobileSlideList /> : <div className="p-4">{panel}</div>;
+  const sectionLabel = shown === 'slides' ? 'Slides' : shown === 'audio' ? (audioSelection === 'add' ? 'Add music' : 'Music') : (tabs.find((t) => t.id === shown)?.label ?? '');
+  const closeSection = () => {
+    if (shown === 'audio') selectAudio(null);
+    setSection(null);
+  };
+  const sectionBody =
+    shown === 'slides' ? (
+      <MobileSlideList />
+    ) : shown === 'audio' ? (
+      <div className="p-4">
+        <AudioPanel embedded={!landscape} onClose={() => setSection(landscape ? activeTab : null)} />
+      </div>
+    ) : (
+      <div className="p-4">{panel}</div>
+    );
 
   const height = vv.height || undefined;
   const typing = vv.keyboardOpen;
@@ -122,7 +147,7 @@ export default function MobileEditor({
               bottomOffset={typing ? 0 : TABBAR_H}
               snap={typing ? 'full' : snap}
               onSnap={setSnap}
-              onClose={() => setSection(null)}
+              onClose={closeSection}
             >
               {sectionBody}
             </BottomSheet>
@@ -340,6 +365,7 @@ function SlideStrip() {
         {entries.map((e) => (
           <StripThumb key={e.key} entry={e} />
         ))}
+        <MusicChip />
         <button
           onClick={() => setAddOpen((v) => !v)}
           aria-label="Add a slide"
@@ -375,6 +401,25 @@ function SlideStrip() {
       )}
       <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={onAddFiles} />
     </div>
+  );
+}
+
+/** The music's place in the phone layout (no timeline here): opens its
+ * settings, or the music browser when there's none yet. */
+function MusicChip() {
+  const music = useEditorStore((s) => musicClip(s.project));
+  const selected = useEditorStore((s) => s.audioSelection !== null);
+  const selectAudio = useEditorStore((s) => s.selectAudio);
+  return (
+    <button
+      onClick={() => selectAudio(music?.id ?? 'add')}
+      aria-label={music ? `Music: ${music.name}` : 'Add music'}
+      aria-current={selected}
+      className={`flex h-[60px] max-w-[110px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[10px] border-2 px-2 ${selected ? 'border-[#8b7dff]' : music ? 'border-[#2fb6a0]/50' : 'border-dashed border-white/[.25]'} ${music ? 'bg-[#2fb6a0]/[.16]' : ''} active:bg-white/[.08]`}
+    >
+      <span className="text-[18px] leading-none text-[#c9cdd8]">♪</span>
+      <span className="w-full truncate text-center text-[10px] font-semibold text-[#c9cdd8]">{music ? music.name : 'Music'}</span>
+    </button>
   );
 }
 

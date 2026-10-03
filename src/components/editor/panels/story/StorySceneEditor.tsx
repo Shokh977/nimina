@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { musicClip } from '@/engine/audio/clips';
 import { getStoryTimeline } from '@/engine/story';
 import type { StorySlide } from '@/engine/types';
 import { useEditorStore } from '@/store/editorStore';
@@ -20,7 +21,7 @@ export default function StorySceneEditor({ slide }: { slide: StorySlide }) {
  const applyStyleToAll = useEditorStore((s) => s.applyStyleToAll);
  const addStoryAction = useEditorStore((s) => s.addStoryAction);
  const reorderStoryActions = useEditorStore((s) => s.reorderStoryActions);
- const musicBpm = useEditorStore((s) => s.project.music?.bpm);
+ const musicBpm = useEditorStore((s) => musicClip(s.project)?.bpm);
  const [selectedActionId, setSelectedActionId] = useState<string | null>(slide.actions[0]?.id ?? null);
  const [addType, setAddType] = useState(ACTION_TYPES[0][0]);
  const [dragIndex, setDragIndex] = useState<number | null>(null);

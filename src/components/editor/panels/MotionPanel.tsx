@@ -1,21 +1,14 @@
 'use client';
 
+import { musicClip } from '@/engine/audio/clips';
 import { TEXT_ANIMS, TRANSITIONS } from '@/engine/constants';
 import type { TextAnim, Transition } from '@/engine/types';
 import { useEditorStore } from '@/store/editorStore';
-import MusicSection from './MusicSection';
 import Details from '../ui/Details';
 import RangeInput from '../ui/RangeInput';
 import SectionLabel from '../ui/SectionLabel';
 import SegButtons from '../ui/SegButtons';
 import SelectableRow from '../ui/SelectableRow';
-import ToggleRow from '../ui/ToggleRow';
-
-let sharedAudioCtx: AudioContext | null = null;
-function getAudioContext(): AudioContext {
-  if (!sharedAudioCtx) sharedAudioCtx = new AudioContext();
-  return sharedAudioCtx;
-}
 
 // A curated shortcut that sets textAnim + transition together — not a
 // replacement for them (both stay independently adjustable in Advanced
@@ -33,8 +26,8 @@ export default function MotionPanel() {
   const setTextAnim = useEditorStore((s) => s.setTextAnim);
   const setTransition = useEditorStore((s) => s.setTransition);
   const setMotionSpeed = useEditorStore((s) => s.setMotionSpeed);
-  const setVolume = useEditorStore((s) => s.setVolume);
-  const setDucking = useEditorStore((s) => s.setDucking);
+  const selectAudio = useEditorStore((s) => s.selectAudio);
+  const music = useEditorStore((s) => musicClip(s.project));
 
   const activePresetId = MOTION_PRESETS.find((p) => p.textAnim === project.textAnim && p.transition === project.transition)?.id ?? null;
 
@@ -76,16 +69,16 @@ export default function MotionPanel() {
       <RangeInput min={60} max={160} step={10} value={project.motionSpeed} onChange={setMotionSpeed} label="Speed" valueLabel={`${(project.motionSpeed / 100).toFixed(1)}×`} />
 
       <div>
-        <MusicSection getAudioContext={getAudioContext} />
-        <div className="mt-3">
-          <RangeInput min={0} max={1} step={0.05} value={project.volume} onChange={setVolume} label="Volume" />
-        </div>
-        <p className="mt-1.5 text-[12px] text-[#767e8d]">The track loops if it&apos;s shorter than the video and fades out at the end.</p>
-        <div className="mt-2.5">
-          <ToggleRow title="Duck under story sound effects" sub="Briefly lowers the music whenever a story action's SFX plays" checked={project.ducking} onChange={setDucking} />
-        </div>
+        <SectionLabel>Music</SectionLabel>
+        <button
+          type="button"
+          onClick={() => selectAudio(music?.id ?? 'add')}
+          className="w-full rounded-[10px] border border-white/[.08] bg-white/[.03] px-3 py-2.5 text-left text-[13px] text-[#c9cdd8] hover:border-[#8b7dff]/40 hover:bg-[#5b4bff]/[.08]"
+        >
+          {music ? <>♪ {music.name} <span className="text-[#8b7dff]">· Edit</span></> : <span className="font-semibold">＋ Add music</span>}
+        </button>
+        <p className="mt-1.5 text-[12px] text-[#767e8d]">Music lives on the timeline, under your slides.</p>
       </div>
-
     </div>
   );
 }

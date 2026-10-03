@@ -339,8 +339,6 @@ export const SOCIAL_TEMPLATE: TemplateDef = {
       // of dropped, since the intent (signal the app is new) survives.
       outro: { on: true, dur: 2.8, cta: strings.outroCta, button: 'Get started', small: 'New · free to join', style: {} },
       quality: '1080',
-      music: null,
-      volume: 0.8,
       ducking: true,
       motionSpeed: 100,
       scenes,

@@ -50,7 +50,7 @@ export default function TemplatePreviewRegenerator({ templateId, sampleAssetsSou
  ] as const) {
  try {
  const project = applyShortVariant(data.project, data.shortVariant);
- const result = await exportVideo({ ...project, format: fmt }, assets, null, { resolution: '1080p' }, new AbortController().signal);
+ const result = await exportVideo({ ...project, format: fmt }, assets, {}, { resolution: '1080p' }, new AbortController().signal);
  urls[tag] = await uploadTemplatePreview(templateId, tag, result.blob);
  lines.push(`[ok] ${tag}: ${(result.sizeBytes / 1048576).toFixed(2)}MB, ${result.seconds.toFixed(1)}s`);
  } catch (err) {

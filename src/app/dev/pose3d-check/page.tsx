@@ -54,8 +54,6 @@ function buildProject(model: ModelKey, fcolor: FrameColorId, pose: PosePresetKey
     iconAssetId: null,
     outro: { on: false, dur: 0, cta: '', button: '', small: '', style: {} },
     quality: '1080',
-    music: null,
-    volume: 0.8,
     ducking: true,
     motionSpeed: 100,
     scenes: [
