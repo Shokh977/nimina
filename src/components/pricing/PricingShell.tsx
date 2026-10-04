@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 
 import { getPaddle } from '@/lib/paddle/client';
 import type { Pricing, PricingEntry } from '@/lib/paddle/catalog';
+import PlanDetails from './PlanDetails';
 
 type Cycle = 'monthly' | 'yearly';
 
@@ -113,7 +114,7 @@ export default function PricingShell({
   };
 
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-12">
+    <div className="mx-auto max-w-[900px] px-4 py-12">
       <h1 className="text-center text-3xl font-bold">Pricing</h1>
       <p className="mt-2 text-center text-[15px] text-neutral-500 dark:text-neutral-400">Start free. Upgrade when you need more.</p>
 
@@ -199,6 +200,8 @@ export default function PricingShell({
           )}
         </div>
       </div>
-    </main>
+
+      <PlanDetails />
+    </div>
   );
 }

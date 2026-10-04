@@ -441,13 +441,15 @@ defaults, `node --env-file=.env.local scripts/apply-homepage-copy.ts
 prices an admin set). The page also emits JSON-LD (SoftwareApplication +
 FAQPage, no ratings) and its FAQ answers stay in the HTML when collapsed.
 
-**`/privacy`, `/terms`, `/refunds` are placeholder text, clearly marked as
-such on the page itself — they must be reviewed (ideally by a lawyer) and
-have every bracketed `[...]` filled in before publishing.** They're grounded
-in what the app actually does (Supabase for auth/storage, Paddle as
-merchant of record) but make no claims beyond that — no specific refund
-windows, data-retention periods, or compliance certifications were
-invented; those are business/legal decisions left as placeholders.
+**`/terms`, `/privacy`, `/refunds` are real documents** (operator, country,
+contact email, refund window, minimum age and "last updated" live in
+`src/lib/legal.ts` — change facts there, and bump `updated` when a page's
+meaning changes). Every claim in them describes what the app actually does
+(Paddle as Merchant of Record, the processors and their regions, retention
+incl. 8-week backups, deletion behaviour, AI via Anthropic); keep them in
+step when that changes. `/pricing` ends with a plan comparison and billing
+FAQ (`PlanDetails.tsx`) read from `PLAN_LIMITS`. They were drafted without a
+lawyer — have them reviewed before relying on them.
 
 The marketing layout uses `next/font` (self-hosted Bricolage Grotesque +
 Figtree) rather than the engine's own font CSS (see Engine fonts below) —
