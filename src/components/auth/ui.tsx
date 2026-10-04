@@ -57,7 +57,7 @@ export function Notice({ tone = 'error', children }: { tone?: 'error' | 'info' |
 
 export function Divider({ label = 'or' }: { label?: string }) {
   return (
-    <div className="my-5 flex items-center gap-3 text-[12px] text-[#6b7280]">
+    <div className="my-5 flex items-center gap-3 text-[12px] text-[#8b93a1]">
       <span className="h-px flex-1 bg-white/[.09]" />
       {label}
       <span className="h-px flex-1 bg-white/[.09]" />
@@ -206,7 +206,16 @@ export async function postAuth(url: string, body: unknown): Promise<AuthResult> 
   }
 }
 
-/** Only same-site paths; anything else falls back to /projects. */
+const BACKSLASH = String.fromCharCode(92);
+
+/** Where to go after signing in: only a path on this site, else /projects.
+ * Rejects protocol-relative and backslash forms ("//host", "/" + backslash
+ * + "host") that browsers resolve to another site, and whitespace/control
+ * characters. */
 export function safeNext(raw: string | null): string {
-  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/projects';
+  return isSafeNextPath(raw) ? raw! : '/projects';
+}
+
+export function isSafeNextPath(raw: string | null | undefined): boolean {
+  return !!raw && raw.length < 512 && raw.startsWith('/') && !raw.startsWith('//') && !raw.includes(BACKSLASH) && !/[\s\x00-\x1f]/.test(raw);
 }

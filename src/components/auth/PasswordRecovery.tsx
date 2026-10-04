@@ -199,7 +199,7 @@ export function VerifyEmailForm() {
         </button>
         <AuthFooterLink href="/signup">Use a different email</AuthFooterLink>
       </div>
-      <p className="mt-4 text-[12px] text-[#6b7280]">You can&apos;t sign in or export until the address is verified. Didn&apos;t get it? Check spam.</p>
+      <p className="mt-4 text-[12px] text-[#8b93a1]">You can&apos;t sign in or export until the address is verified. Didn&apos;t get it? Check spam.</p>
     </AuthCard>
   );
 }

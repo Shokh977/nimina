@@ -84,7 +84,7 @@ export default function PlanDetails() {
           </div>
         ))}
       </dl>
-      <p className="mt-10 text-center text-[13px] text-neutral-500 dark:text-neutral-400">
+      <p className="mt-10 text-center text-[13px] text-neutral-600 dark:text-neutral-400">
         By purchasing you agree to our{' '}
         <Link href="/terms" className="underline">
           Terms

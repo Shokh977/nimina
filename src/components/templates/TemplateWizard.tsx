@@ -150,17 +150,17 @@ export default function TemplateWizard({ templateId, onClose }: { templateId: st
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-[18px] font-bold">{template.name}</h2>
-            <p className="mt-0.5 text-[13px] text-neutral-500 dark:text-neutral-400">{template.description}</p>
+            <p className="mt-0.5 text-[13px] text-neutral-600 dark:text-neutral-400">{template.description}</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="rounded-lg border border-black/10 px-2.5 py-1 text-[13px] font-bold dark:border-white/10">
             ✕
           </button>
         </div>
 
-        <p className="mt-4 text-[12.5px] font-bold text-neutral-500 dark:text-neutral-400">
+        <p className="mt-4 text-[12.5px] font-bold text-neutral-600 dark:text-neutral-400">
           {filledCount} of {slots.length} screenshots added
         </p>
-        <p className="mt-0.5 text-[12px] text-neutral-500 dark:text-neutral-400">Skip any you don&apos;t have yet — you can add or change every screenshot in the editor.</p>
+        <p className="mt-0.5 text-[12px] text-neutral-600 dark:text-neutral-400">Skip any you don&apos;t have yet — you can add or change every screenshot in the editor.</p>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {slots.map((slot) => (
             <label key={slot.key} className="block cursor-pointer">
@@ -169,10 +169,10 @@ export default function TemplateWizard({ templateId, onClose }: { templateId: st
                   // eslint-disable-next-line @next/next/no-img-element -- in-memory/data-URL preview
                   <img src={previews[slot.key]} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <span className="px-2 text-center text-[11px] text-neutral-400">{slot.label}</span>
+                  <span className="px-2 text-center text-[11px] text-neutral-600">{slot.label}</span>
                 )}
               </div>
-              <span className="mt-1 block truncate text-center text-[11px] text-neutral-500 dark:text-neutral-400">{slot.hint}</span>
+              <span className="mt-1 block truncate text-center text-[11px] text-neutral-600 dark:text-neutral-400">{slot.hint}</span>
               <input type="file" accept="image/*" className="hidden" onChange={(e) => onFile(slot.key, e.target.files?.[0])} />
             </label>
           ))}

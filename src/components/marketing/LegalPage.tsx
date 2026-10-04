@@ -8,7 +8,7 @@ export default function LegalPage({ title, summary, children }: { title: string;
   return (
     <article className="mx-auto max-w-[760px] px-4 py-14 sm:px-6">
       <h1 className="font-[family-name:var(--font-bricolage)] text-[32px] font-extrabold tracking-tight">{title}</h1>
-      <p className="mt-1 text-[13px] text-neutral-500 dark:text-neutral-400">Last updated: {LEGAL.updated}</p>
+      <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-400">Last updated: {LEGAL.updated}</p>
       {summary && (
         <div className="mt-6 rounded-2xl border border-black/10 bg-white/60 px-5 py-4 text-[14px] leading-relaxed text-neutral-700 dark:border-white/10 dark:bg-white/[.03] dark:text-neutral-300">
           <p className="mb-1.5 font-bold text-neutral-900 dark:text-neutral-100">In short</p>

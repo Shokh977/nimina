@@ -116,7 +116,7 @@ export default function PricingShell({
   return (
     <div className="mx-auto max-w-[900px] px-4 py-12">
       <h1 className="text-center text-3xl font-bold">Pricing</h1>
-      <p className="mt-2 text-center text-[15px] text-neutral-500 dark:text-neutral-400">Start free. Upgrade when you need more.</p>
+      <p className="mt-2 text-center text-[15px] text-neutral-600 dark:text-neutral-400">Start free. Upgrade when you need more.</p>
 
       {checkoutError && <p className="mx-auto mt-4 max-w-105 rounded-xl bg-red-50 px-3 py-2 text-center text-[13px] text-red-700 dark:bg-red-500/10 dark:text-red-400">{checkoutError}</p>}
 
@@ -127,7 +127,7 @@ export default function PricingShell({
               key={c}
               onClick={() => setCycle(c)}
               aria-pressed={cycle === c}
-              className="rounded-full px-4 py-1.5 text-[13.5px] font-semibold text-neutral-500 aria-pressed:bg-neutral-900 aria-pressed:text-white dark:text-neutral-400 dark:aria-pressed:bg-white dark:aria-pressed:text-neutral-900"
+              className="rounded-full px-4 py-1.5 text-[13.5px] font-semibold text-neutral-600 aria-pressed:bg-neutral-900 aria-pressed:text-white dark:text-neutral-400 dark:aria-pressed:bg-white dark:aria-pressed:text-neutral-900"
             >
               {c === 'monthly' ? 'Monthly' : 'Yearly'}
             </button>
@@ -138,7 +138,7 @@ export default function PricingShell({
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-3xl border border-black/10 p-6 dark:border-white/10">
           <h2 className="text-lg font-bold">Free</h2>
-          <p className="mt-1 text-[13.5px] text-neutral-500 dark:text-neutral-400">Try it out.</p>
+          <p className="mt-1 text-[13.5px] text-neutral-600 dark:text-neutral-400">Try it out.</p>
           <p className="mt-4 text-2xl font-bold">$0</p>
           <ul className="mt-5 space-y-2 text-[14px]">
             <li>1 saved project</li>
@@ -159,7 +159,7 @@ export default function PricingShell({
 
         <div className="rounded-3xl border-2 border-indigo-500 p-6">
           <h2 className="text-lg font-bold">Pro</h2>
-          <p className="mt-1 text-[13.5px] text-neutral-500 dark:text-neutral-400">For shipping real launches.</p>
+          <p className="mt-1 text-[13.5px] text-neutral-600 dark:text-neutral-400">For shipping real launches.</p>
           <p className="mt-4 text-2xl font-bold">{priceLabel(proEntry, ` / ${cycle === 'monthly' ? 'mo' : 'yr'}`)}</p>
           <ul className="mt-5 space-y-2 text-[14px]">
             <li>Unlimited projects</li>
@@ -176,13 +176,13 @@ export default function PricingShell({
               {starting === 'subscription' ? 'Opening checkout…' : `Upgrade — billed ${cycle}`}
             </button>
           ) : (
-            <p className="mt-6 rounded-xl bg-neutral-100 px-3 py-2 text-center text-[12.5px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">{checkoutAvailable ? 'Pricing is being set up — check back soon.' : "Checkout isn't set up yet."}</p>
+            <p className="mt-6 rounded-xl bg-neutral-100 px-3 py-2 text-center text-[12.5px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">{checkoutAvailable ? 'Pricing is being set up — check back soon.' : "Checkout isn't set up yet."}</p>
           )}
         </div>
 
         <div className="rounded-3xl border border-black/10 p-6 dark:border-white/10">
           <h2 className="text-lg font-bold">Lifetime</h2>
-          <p className="mt-1 text-[13.5px] text-neutral-500 dark:text-neutral-400">Pay once, Pro forever.</p>
+          <p className="mt-1 text-[13.5px] text-neutral-600 dark:text-neutral-400">Pay once, Pro forever.</p>
           <p className="mt-4 text-2xl font-bold">{priceLabel(lifetimeEntry, '')}</p>
           <ul className="mt-5 space-y-2 text-[14px]">
             <li>Everything in Pro</li>
@@ -196,7 +196,7 @@ export default function PricingShell({
               {starting === 'lifetime' ? 'Opening checkout…' : 'Buy lifetime access'}
             </button>
           ) : (
-            <p className="mt-6 rounded-xl bg-neutral-100 px-3 py-2 text-center text-[12.5px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">{checkoutAvailable ? 'Pricing is being set up — check back soon.' : "Checkout isn't set up yet."}</p>
+            <p className="mt-6 rounded-xl bg-neutral-100 px-3 py-2 text-center text-[12.5px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">{checkoutAvailable ? 'Pricing is being set up — check back soon.' : "Checkout isn't set up yet."}</p>
           )}
         </div>
       </div>

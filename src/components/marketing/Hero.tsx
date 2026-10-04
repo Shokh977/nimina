@@ -17,7 +17,7 @@ export default function Hero() {
           See pricing
         </Link>
       </div>
-      <p className="mt-3 text-[12.5px] text-neutral-500 dark:text-neutral-400">Free plan available. No credit card required to start.</p>
+      <p className="mt-3 text-[12.5px] text-neutral-600 dark:text-neutral-400">Free plan available. No credit card required to start.</p>
     </section>
   );
 }

@@ -117,7 +117,7 @@ export default function CodeSignIn({
           Use a different email
         </button>
       </div>
-      <p className="text-[12px] text-[#6b7280]">Codes expire after 10 minutes. Only the newest code works.</p>
+      <p className="text-[12px] text-[#8b93a1]">Codes expire after 10 minutes. Only the newest code works.</p>
     </form>
   );
 }

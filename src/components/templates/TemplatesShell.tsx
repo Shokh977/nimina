@@ -57,7 +57,7 @@ export default function TemplatesShell({ userEmail, templates }: { userEmail: st
 
       <div className="mt-6">
         <h1 className="text-2xl font-bold">Start from a template</h1>
-        <p className="mt-1 text-[13.5px] text-neutral-500 dark:text-neutral-400">Pick a style, drop in your screenshots, and you&apos;re editing a finished promo in seconds.</p>
+        <p className="mt-1 text-[13.5px] text-neutral-600 dark:text-neutral-400">Pick a style, drop in your screenshots, and you&apos;re editing a finished promo in seconds.</p>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -83,9 +83,9 @@ export default function TemplatesShell({ userEmail, templates }: { userEmail: st
             <div className="p-4">
               <span className="text-[11px] font-bold tracking-wide text-indigo-600 uppercase dark:text-indigo-400">{t.category}</span>
               <h3 className="mt-1 text-[16px] font-bold">{t.name}</h3>
-              <p className="mt-1 text-[13px] text-neutral-500 dark:text-neutral-400">{t.description}</p>
+              <p className="mt-1 text-[13px] text-neutral-600 dark:text-neutral-400">{t.description}</p>
               {(t.durationSeconds || t.slotCount) && (
-                <p className="mt-1.5 text-[11.5px] font-semibold text-neutral-400 dark:text-neutral-500">
+                <p className="mt-1.5 text-[11.5px] font-semibold text-neutral-600 dark:text-neutral-500">
                   {t.durationSeconds ? `${Math.round(t.durationSeconds)}s` : null}
                   {t.durationSeconds && t.slotCount ? ' · ' : null}
                   {t.slotCount ? `${t.slotCount} screenshot${t.slotCount === 1 ? '' : 's'}` : null}
@@ -96,7 +96,7 @@ export default function TemplatesShell({ userEmail, templates }: { userEmail: st
         ))}
       </div>
 
-      {templates.length === 0 && <p className="mt-8 text-center text-[14px] text-neutral-500 dark:text-neutral-400">No templates available right now.</p>}
+      {templates.length === 0 && <p className="mt-8 text-center text-[14px] text-neutral-600 dark:text-neutral-400">No templates available right now.</p>}
 
       {openId && <TemplateWizard templateId={openId} onClose={() => setOpenId(null)} />}
 
@@ -106,14 +106,14 @@ export default function TemplatesShell({ userEmail, templates }: { userEmail: st
             <h2 id="signup-title" className="text-lg font-bold">
               Use “{signUpFor.name}”
             </h2>
-            <p className="mt-2 text-[13.5px] text-neutral-500 dark:text-neutral-400">Create a free account to drop your screenshots into this template. No card needed.</p>
+            <p className="mt-2 text-[13.5px] text-neutral-600 dark:text-neutral-400">Create a free account to drop your screenshots into this template. No card needed.</p>
             <Link
               href={`/signup?next=${encodeURIComponent(`/templates?open=${signUpFor.id}`)}`}
               className="mt-5 block rounded-xl bg-indigo-600 px-4 py-2.5 font-bold text-white hover:bg-indigo-500"
             >
               Start free
             </Link>
-            <button type="button" onClick={() => setSignUpFor(null)} className="mt-2 w-full rounded-xl px-4 py-2 text-[13.5px] font-semibold text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+            <button type="button" onClick={() => setSignUpFor(null)} className="mt-2 w-full rounded-xl px-4 py-2 text-[13.5px] font-semibold text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800">
               Keep browsing
             </button>
           </div>

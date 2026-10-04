@@ -65,7 +65,7 @@ export default function SignUpForm() {
         <CodeSignIn intent="signup" next={next} stay email={email} setEmail={setEmail} />
       )}
 
-      <p className="mt-4 text-[12.5px] leading-relaxed text-[#6b7280]">
+      <p className="mt-4 text-[12.5px] leading-relaxed text-[#8b93a1]">
         By creating an account you agree to the{' '}
         <Link href="/terms" className="underline hover:text-[#9aa1af]">
           Terms

@@ -33,7 +33,9 @@ export async function GET(request: Request) {
   // /projects, not /editor: /editor creates a project on arrival, which would
   // spend a free user's single project before they've picked a template.
   const rawNext = searchParams.get('next');
-  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/projects';
+  // Only a path on this site: no "//host", no backslash (browsers read "/" + backslash + "host" as another site), no whitespace/control characters.
+  const safe = !!rawNext && rawNext.length < 512 && rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.includes(String.fromCharCode(92)) && !/[\s\x00-\x1f]/.test(rawNext);
+  const next = safe ? rawNext! : '/projects';
   const fail = (message: string) => NextResponse.redirect(`${origin}/login?next=${encodeURIComponent(next)}&error=${encodeURIComponent(friendly(message))}`);
 
   const upstreamError = searchParams.get('error_description') || searchParams.get('error');

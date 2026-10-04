@@ -2,18 +2,12 @@ import { NextResponse } from 'next/server';
 
 import { isAiDirectorConfigured } from '@/lib/ai/config';
 import { shrinkForAi } from '@/lib/ai/image';
-import { featureUsage } from '@/lib/ai/usage';
+import { aiFailureMessage, limitMessage, releaseAiUse, reserveAiUse } from '@/lib/ai/reserve';
 import { runElementDetector } from '@/lib/ai/elementDetector';
 import { DetectElementsRequestSchema } from '@/lib/ai/schema';
-import { logEvent } from '@/lib/events';
-import { PLAN_LIMITS, type Plan } from '@/lib/plan';
+import type { Plan } from '@/lib/plan';
 import { isR2Configured, projectKey, r2 } from '@/lib/r2/server';
 import { createClient } from '@/lib/supabase/server';
-
-function startOfMonthIso(): string {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-}
 
 /** "Detect elements" — Claude-with-vision bounding boxes for buttons/cards/
  * list items/bubbles on one screenshot, shown as clickable cutout
@@ -46,17 +40,6 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from('profiles').select('plan').eq('id', user.id).maybeSingle();
   const plan: Plan = profile?.plan === 'pro' ? 'pro' : 'free';
 
-  const { count } = await supabase
-    .from('events')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('type', 'detect_elements_used')
-    .gte('created_at', startOfMonthIso());
-  const used = count ?? 0;
-  const limit = PLAN_LIMITS[plan].maxElementDetectUsesPerMonth;
-  if (used >= limit) {
-    return NextResponse.json({ error: `You've used "Detect elements" ${used} times this month (limit ${limit} on the ${plan} plan). Try again next month${plan === 'free' ? ', or upgrade to Pro' : ''}.` }, { status: 429 });
-  }
 
   let base64: string;
   let mediaType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
@@ -73,12 +56,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Couldn't load the screenshot to analyze." }, { status: 400 });
   }
 
+  const reservation = await reserveAiUse(supabase, user.id, 'detect', plan, { projectId });
+  if (!reservation.ok) return NextResponse.json({ error: limitMessage('Detect elements', reservation.usage, plan) }, { status: 429 });
   try {
     const result = await runElementDetector(process.env.ANTHROPIC_API_KEY!, base64, mediaType);
-    void logEvent(supabase, 'detect_elements_used', { projectId, elementCount: result.elements.length });
-    return NextResponse.json({ ...result, usage: featureUsage(plan, 'detect', used + 1) });
+    return NextResponse.json({ ...result, usage: reservation.usage });
   } catch (err) {
+    await releaseAiUse(reservation.id);
     console.error('[detect elements] request failed', err);
-    return NextResponse.json({ error: "Couldn't detect elements this time — try again." }, { status: 502 });
+    return NextResponse.json({ error: aiFailureMessage(err, "Couldn't detect elements this time — try again.") }, { status: 502 });
   }
 }
