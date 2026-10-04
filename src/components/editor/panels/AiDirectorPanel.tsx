@@ -3,6 +3,8 @@
 import { useState } from 'react';
 
 import type { ImageSlide } from '@/engine/types';
+import { AiUsageNote, reportAiUsage, useAiUsage } from '@/components/ai/useAiUsage';
+import { MAX_DIRECTOR_SLIDES } from '@/lib/ai/usage';
 import { useEditorStore } from '@/store/editorStore';
 
 interface SlideSuggestion {
@@ -27,13 +29,16 @@ export default function AiDirectorPanel() {
  const project = useEditorStore((s) => s.project);
  const projectId = useEditorStore((s) => s.projectId);
  const updateSlide = useEditorStore((s) => s.updateSlide);
+ const aiUsage = useAiUsage();
  const [goal, setGoal] = useState('');
  const [loading, setLoading] = useState(false);
  const [error, setError] = useState('');
  const [result, setResult] = useState<DirectorResult | null>(null);
  const [appliedIds, setAppliedIds] = useState<Set<number>>(new Set());
 
- const imageSlides = project.scenes.filter((s): s is ImageSlide => s.kind === 'image' && !!s.imgAssetId);
+ const allImageSlides = project.scenes.filter((s): s is ImageSlide => s.kind === 'image' && !!s.imgAssetId);
+ // One run looks at up to MAX_DIRECTOR_SLIDES screenshots (cost cap) — the first ones.
+ const imageSlides = allImageSlides.slice(0, MAX_DIRECTOR_SLIDES);
 
  const run = async () => {
  if (!projectId) {
@@ -61,6 +66,7 @@ export default function AiDirectorPanel() {
  const data = await res.json();
  if (!res.ok) throw new Error(data?.error || 'AI Director failed.');
  setResult(data as DirectorResult);
+ reportAiUsage('director', data.usage);
  } catch (err) {
  setError(err instanceof Error ? err.message : 'AI Director failed.');
  } finally {
@@ -94,9 +100,11 @@ export default function AiDirectorPanel() {
  className="mt-1 block w-full rounded-lg border border-white/[.12] bg-white/[.03] px-2.5 py-2 text-[14.5px] "
  />
  </label>
- <button onClick={run} disabled={loading} className="mt-3 rounded-xl bg-[#5b4bff] px-4 py-2.5 font-bold text-white disabled:opacity-50">
+ <button onClick={run} disabled={loading || aiUsage?.features.director.left === 0} className="mt-3 rounded-xl bg-[#5b4bff] px-4 py-2.5 font-bold text-white disabled:opacity-50">
  {loading ? 'Thinking…' : `Analyze ${imageSlides.length} slide${imageSlides.length === 1 ? '' : 's'}`}
  </button>
+ <AiUsageNote feature="director" unit="runs" className="mt-2" />
+ {allImageSlides.length > MAX_DIRECTOR_SLIDES && <p className="mt-1 text-[12px] text-[#767e8d]">Each run looks at the first {MAX_DIRECTOR_SLIDES} screenshot slides.</p>}
 
  {error && <p className="mt-3 text-[13px] font-semibold text-[#ff8f76]">{error}</p>}
 

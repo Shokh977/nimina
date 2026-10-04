@@ -4,6 +4,7 @@ import type { Plan } from '@/lib/plan';
 import { PLAN_LIMITS } from '@/lib/plan';
 import { isAiDirectorConfigured } from '@/lib/ai/config';
 import { shrinkForAi } from '@/lib/ai/image';
+import { featureUsage } from '@/lib/ai/usage';
 import { runDirector, type DirectorImage } from '@/lib/ai/director';
 import { DirectorRequestSchema } from '@/lib/ai/schema';
 import { logEvent } from '@/lib/events';
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
   try {
     const result = await runDirector(process.env.ANTHROPIC_API_KEY!, goal, images);
     void logEvent(supabase, 'ai_director_used', { projectId, slideCount: result.slides.length });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, usage: featureUsage(plan, 'director', used + 1) });
   } catch (err) {
     console.error('[ai director] request failed', err);
     return NextResponse.json({ error: "AI Director couldn't come up with suggestions this time — try again." }, { status: 502 });

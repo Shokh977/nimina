@@ -3,12 +3,14 @@ import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 
 import { LOCALES, localeDef } from '@/engine/locales';
+import { MAX_TRANSLATE_STRINGS } from './usage';
 
 // Short marketing lines don't need the largest model; every translation is
 // reviewed by the user before it's applied.
 const MODEL = 'claude-sonnet-5-5';
 const MAX_TOKENS = 16000;
-const MAX_STRINGS = 300;
+// One request = one use; the editor splits longer lists (src/lib/ai/usage.ts).
+const MAX_STRINGS = MAX_TRANSLATE_STRINGS;
 const MAX_STRING_LENGTH = 600;
 
 const localeCode = z.string().refine((c) => LOCALES.some((l) => l.code === c), 'Unsupported language');

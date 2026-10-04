@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { isAiDirectorConfigured } from '@/lib/ai/config';
 import { runTranslate, TranslateRequestSchema } from '@/lib/ai/translate';
+import { featureUsage } from '@/lib/ai/usage';
 import { logEvent } from '@/lib/events';
 import { PLAN_LIMITS, type Plan } from '@/lib/plan';
 import { createClient } from '@/lib/supabase/server';
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
   try {
     const result = await runTranslate(process.env.ANTHROPIC_API_KEY!, parsed.data);
     void logEvent(supabase, 'ai_translate_used', { target: parsed.data.targetLocale, strings: parsed.data.strings.length, missing: result.missing.length });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, usage: featureUsage(plan, 'translate', used + 1) });
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) return NextResponse.json({ error: 'The translation service is busy — try again in a minute.' }, { status: 503 });
     if (err instanceof Anthropic.APIError) console.error(`[ai translate] API error ${err.status}`, err.message);

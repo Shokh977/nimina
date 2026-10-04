@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { MAX_DIRECTOR_SLIDES } from './usage';
+
 /** Mirrors the engine's SlideAnim/Effect unions (src/engine/types.ts) — kept
  * as an explicit allowlist here rather than importing the type, since zod
  * needs runtime values to validate the model's response against, and this
@@ -36,7 +38,7 @@ export const DirectorRequestSchema = z.object({
       }),
     )
     .min(1)
-    .max(12),
+    .max(MAX_DIRECTOR_SLIDES),
 });
 
 export type DirectorRequest = z.infer<typeof DirectorRequestSchema>;

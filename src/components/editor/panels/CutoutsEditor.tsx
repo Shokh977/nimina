@@ -4,6 +4,8 @@ import { useState } from 'react';
 
 import { CUTOUT_PRESETS } from '@/engine/constants';
 import type { CutoutLayer, CutoutPreset, ImageSlide } from '@/engine/types';
+import { AiUsageNote, reportAiUsage, useAiUsage } from '@/components/ai/useAiUsage';
+import type { AiFeatureUsage } from '@/lib/ai/usage';
 import { useEditorStore } from '@/store/editorStore';
 import CutoutsPicker, { type CutoutSuggestion } from './CutoutsPicker';
 
@@ -24,6 +26,7 @@ export default function CutoutsEditor({ slide, img }: { slide: ImageSlide; img: 
  const updateCutout = useEditorStore((s) => s.updateCutout);
  const removeCutout = useEditorStore((s) => s.removeCutout);
  const updateSlide = useEditorStore((s) => s.updateSlide);
+ const aiUsage = useAiUsage();
  const [selectedId, setSelectedId] = useState<string | null>(null);
  const [suggestions, setSuggestions] = useState<CutoutSuggestion[]>([]);
  const [detecting, setDetecting] = useState(false);
@@ -65,6 +68,7 @@ export default function CutoutsEditor({ slide, img }: { slide: ImageSlide; img: 
  const result = data as DetectResponse;
  const elements = result.elements.map((el) => ({ label: el.label, rect: el.rect }));
  updateSlide(slide.id, { detected: { assetId: slide.imgAssetId, elements } });
+ reportAiUsage('detect', (data as { usage?: AiFeatureUsage }).usage);
  showSuggestions(elements);
  } catch (err) {
  setDetectError(err instanceof Error ? err.message : 'Element detection failed.');
@@ -95,7 +99,7 @@ export default function CutoutsEditor({ slide, img }: { slide: ImageSlide; img: 
  />
 
  <div className="mt-2.5 flex items-center gap-2.5">
- <button onClick={() => detect()} disabled={detecting || !slide.imgAssetId} className="rounded-lg border border-white/[.12] bg-white/[.03] px-3 py-1.5 text-[12.5px] font-bold disabled:opacity-50 ">
+ <button onClick={() => detect()} disabled={detecting || !slide.imgAssetId || (!cached && aiUsage?.features.detect.left === 0)} className="rounded-lg border border-white/[.12] bg-white/[.03] px-3 py-1.5 text-[12.5px] font-bold disabled:opacity-50 ">
  {detecting ? 'Looking…' : cached ? '✨ Show detected elements' : '✨ Detect elements'}
  </button>
  {cached && suggestions.length > 0 && (
@@ -105,6 +109,7 @@ export default function CutoutsEditor({ slide, img }: { slide: ImageSlide; img: 
  )}
  {suggestions.length > 0 && <span className="text-[12px] text-[#767e8d] ">Click a suggestion on the screenshot to add it.</span>}
  </div>
+ <AiUsageNote feature="detect" unit="detections" className="mt-1.5" />
  {detectError && <p className="mt-1.5 text-[12.5px] font-semibold text-[#ff8f76]">{detectError}</p>}
 
  {slide.cutouts.length === 0 ? (

@@ -9,6 +9,7 @@ import { checkPassword } from '@/lib/auth/password';
 import { createClient } from '@/lib/supabase/client';
 import { Field, INPUT, Notice, PasswordField, postAuth } from '../auth/ui';
 
+import { AiUsageBars } from '@/components/ai/useAiUsage';
 import StorageMeter from '@/components/storage/StorageMeter';
 import type { StorageUsage } from '@/lib/storage/rules';
 export interface AccountData {
@@ -411,6 +412,9 @@ export default function AccountShell({ data }: { data: AccountData }) {
             <StorageMeter initial={data.storage} />
           </Section>
         )}
+        <Section id="ai" title="AI this month" description="How many AI uses your plan includes this month, and how many are left.">
+          <AiUsageBars />
+        </Section>
         <SessionsSection />
         <Section id="data" title="Your data" description="Download everything we store about you: account details, plan and billing records, every project, and a list of your uploaded files.">
           <a href="/api/account/export" className={BTN_GHOST}>

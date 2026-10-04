@@ -7,6 +7,8 @@ import { useMemo, useState } from 'react';
 import { checkHighlights, collectStrings, fieldLabel, stringStatus, type LocalizableString, type StringStatus } from '@/engine/localization';
 import { LOCALES, localeDef, SCRIPT_FAMILIES } from '@/engine/locales';
 import { isPro, PLAN_LIMITS } from '@/lib/plan';
+import { AiUsageNote, reportAiUsage, useAiUsage } from '@/components/ai/useAiUsage';
+import { MAX_TRANSLATE_STRINGS } from '@/lib/ai/usage';
 import { useEditorStore } from '@/store/editorStore';
 import { useLocaleIssues } from '../useLocaleIssues';
 import RangeInput from '../ui/RangeInput';
@@ -64,6 +66,7 @@ const textFont = (code: string) => {
 export default function LanguagesPanel() {
   const project = useEditorStore((s) => s.project);
   const plan = useEditorStore((s) => s.plan);
+  const aiUsage = useAiUsage();
   const previewLocale = useEditorStore((s) => s.previewLocale);
   const setPreviewLocale = useEditorStore((s) => s.setPreviewLocale);
   const enableLocalization = useEditorStore((s) => s.enableLocalization);
@@ -114,28 +117,40 @@ export default function LanguagesPanel() {
     select(code);
   };
 
+  // Sent in batches of MAX_TRANSLATE_STRINGS (a cost cap per request); each
+  // batch is one use. If a later batch fails, what came back so far is kept.
+  const batches = Math.max(1, Math.ceil(strings.length / MAX_TRANSLATE_STRINGS));
   const translateAll = async () => {
     if (!active) return;
     setAiState({ loading: true, error: '', proposals: null, locale: active.locale });
-    try {
-      const res = await fetch('/api/ai/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceLocale: source, targetLocale: active.locale, appName: project.appName, strings: strings.map(({ key, field, group, source: text }) => ({ key, field, group, source: text })) }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Translation failed.');
-      const proposals: Proposal[] = strings
-        .filter((s) => typeof data.translations[s.key] === 'string')
-        .map((s) => {
-          const current = active.strings[s.key]?.text ?? s.source;
-          return { key: s.key, current, proposed: data.translations[s.key], accept: true };
-        })
-        .filter((p) => p.proposed !== p.current || !active.strings[p.key]?.done);
-      setAiState({ loading: false, error: '', proposals, locale: active.locale });
-    } catch (err) {
-      setAiState({ loading: false, error: err instanceof Error ? err.message : 'Translation failed.', proposals: null, locale: active.locale });
+    const translations: Record<string, string> = {};
+    let error = '';
+    for (let i = 0; i < strings.length; i += MAX_TRANSLATE_STRINGS) {
+      try {
+        const chunk = strings.slice(i, i + MAX_TRANSLATE_STRINGS);
+        const res = await fetch('/api/ai/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourceLocale: source, targetLocale: active.locale, appName: project.appName, strings: chunk.map(({ key, field, group, source: text }) => ({ key, field, group, source: text })) }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Translation failed.');
+        reportAiUsage('translate', data.usage);
+        Object.assign(translations, data.translations);
+      } catch (err) {
+        error = err instanceof Error ? err.message : 'Translation failed.';
+        break;
+      }
     }
+    const proposals: Proposal[] = strings
+      .filter((s) => typeof translations[s.key] === 'string')
+      .map((s) => {
+        const current = active.strings[s.key]?.text ?? s.source;
+        return { key: s.key, current, proposed: translations[s.key], accept: true };
+      })
+      .filter((p) => p.proposed !== p.current || !active.strings[p.key]?.done);
+    if (error && Object.keys(translations).length) error += ' The lines translated before that are below for review.';
+    setAiState({ loading: false, error, proposals: Object.keys(translations).length ? proposals : null, locale: active.locale });
   };
 
   const applyProposals = () => {
@@ -241,12 +256,16 @@ export default function LanguagesPanel() {
             <button
               type="button"
               onClick={translateAll}
-              disabled={aiState.loading || PLAN_LIMITS[plan].maxTranslateUsesPerMonth === 0}
+              disabled={aiState.loading || PLAN_LIMITS[plan].maxTranslateUsesPerMonth === 0 || aiUsage?.features.translate.left === 0}
               className="w-full rounded-xl bg-[#5b4bff] px-4 py-2.5 text-[14px] font-semibold text-white transition-colors duration-[.16s] hover:bg-[#6d5eff] disabled:opacity-50"
             >
               {aiState.loading ? 'Translating…' : `Translate all into ${localeDef(active.locale).label} with AI${isPro(plan) ? '' : ' 🔒'}`}
             </button>
-            <p className="mt-2 text-[12px] text-[#767e8d]">Every change is shown for review first; nothing is applied until you accept it.</p>
+            <p className="mt-2 text-[12px] text-[#767e8d]">
+              Every change is shown for review first; nothing is applied until you accept it.
+              {batches > 1 ? ` This project has ${strings.length} lines, so it uses ${batches} translations (each covers up to ${MAX_TRANSLATE_STRINGS} lines).` : ''}
+            </p>
+            <AiUsageNote feature="translate" unit="translations" className="mt-1" />
             {aiState.error && aiState.locale === active.locale && <p className="mt-2 text-[12.5px] text-[#ff8f76]">{aiState.error}</p>}
           </div>
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { isAiDirectorConfigured } from '@/lib/ai/config';
 import { shrinkForAi } from '@/lib/ai/image';
+import { featureUsage } from '@/lib/ai/usage';
 import { runElementDetector } from '@/lib/ai/elementDetector';
 import { DetectElementsRequestSchema } from '@/lib/ai/schema';
 import { logEvent } from '@/lib/events';
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
   try {
     const result = await runElementDetector(process.env.ANTHROPIC_API_KEY!, base64, mediaType);
     void logEvent(supabase, 'detect_elements_used', { projectId, elementCount: result.elements.length });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, usage: featureUsage(plan, 'detect', used + 1) });
   } catch (err) {
     console.error('[detect elements] request failed', err);
     return NextResponse.json({ error: "Couldn't detect elements this time — try again." }, { status: 502 });
