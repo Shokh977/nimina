@@ -6,28 +6,22 @@ import { LEGAL } from '@/lib/legal';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'What personal data Nimina collects, why, who processes it (Supabase, Cloudflare, Vercel, Paddle, Anthropic, Brevo, Google), how long it is kept, and your rights.',
+  description: 'What personal data Nimina collects, why, which kinds of service providers process it, how long it is kept, and your rights.',
   alternates: { canonical: '/privacy' },
 };
-
-const A = ({ href, children }: { href: string; children: React.ReactNode }) => (
-  <a href={href} target="_blank" rel="noopener noreferrer" className="font-semibold text-indigo-600 underline dark:text-indigo-400">
-    {children}
-  </a>
-);
 
 const TH = 'border-b border-black/10 px-3 py-2 text-left font-bold text-neutral-900 dark:border-white/10 dark:text-neutral-100';
 const TD = 'border-b border-black/5 px-3 py-2 align-top dark:border-white/5';
 
-const PROCESSORS: Array<[string, string, string, string]> = [
-  ['Supabase', 'Accounts, sign-in, and the database holding your projects and settings', 'Japan (AWS Tokyo)', 'https://supabase.com/privacy'],
-  ['Cloudflare (R2)', 'Storage of your uploaded files and of our weekly database backups (encrypted at rest)', 'Cloudflare network', 'https://www.cloudflare.com/privacypolicy/'],
-  ['Vercel', 'Hosting the website and its server functions; short-lived request logs', 'Japan (Tokyo) and global edge network', 'https://vercel.com/legal/privacy-policy'],
-  ['Paddle', 'Checkout, payments, invoices, tax and refunds, as Merchant of Record', 'United Kingdom / United States', 'https://www.paddle.com/legal/privacy'],
-  ['Anthropic', 'AI features, only when you use them: the screenshots or text you send', 'United States', 'https://www.anthropic.com/legal/privacy'],
-  ['Brevo', 'Sending account emails: sign-in codes, verification and password reset', 'European Union (France)', 'https://www.brevo.com/legal/privacypolicy/'],
-  ['Google', 'Only if you choose “Continue with Google”: confirming your Google sign-in', 'Global', 'https://policies.google.com/privacy'],
-  ['GitHub', 'Running the automated job that creates the weekly database backup', 'United States', 'https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement'],
+/** Categories only — provider names are available on request (see section 5). */
+const PROCESSORS: Array<[string, string, string]> = [
+  ['Hosting and database', 'Running the website and its server functions, accounts and sign-in, and the database holding your projects and settings; short-lived request logs', 'Japan, with a global delivery network'],
+  ['File storage', 'Storing your uploaded files and our weekly database backups (encrypted at rest)', 'Global cloud storage network'],
+  ['Payments', 'Checkout, payments, invoices, tax and refunds, as Merchant of Record', 'United Kingdom / United States'],
+  ['AI processing', 'AI features, only when you use them: the screenshots or text you send', 'United States'],
+  ['Email delivery', 'Sending account emails: sign-in codes, verification and password reset', 'European Union'],
+  ['Third-party sign-in', 'Only if you choose to sign in with a third-party account (such as Google): confirming that sign-in', 'Global'],
+  ['Automation', 'Running the scheduled job that creates the weekly database backup', 'United States'],
 ];
 
 export default function PrivacyPage() {
@@ -38,7 +32,7 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>We collect what we need to run Nimina: your email and sign-in, your projects and uploaded files, and basic usage counts.</li>
           <li>Your uploads are private to your account. We don&apos;t sell your data, show ads, or use tracking or advertising cookies.</li>
-          <li>Payments go through Paddle — we never see your card. AI features send your content to Anthropic only when you use them, and it isn&apos;t used for training.</li>
+          <li>Payments go through our payment partner — we never see your card. AI features send your content to our AI provider only when you use them, and it isn&apos;t used for training.</li>
           <li>You can export or delete everything yourself from Account settings, or email us.</li>
         </ul>
       }
@@ -49,8 +43,8 @@ export default function PrivacyPage() {
           about privacy: <Mail subject="Nimina — privacy" />.
         </p>
         <p>
-          For payments, <b>Paddle</b> is the Merchant of Record and an independent controller of the data you give at checkout (name, email, address, payment details),
-          under <A href="https://www.paddle.com/legal/privacy">Paddle&apos;s privacy policy</A>.
+          For payments, our payment partner is the Merchant of Record and an independent controller of the data you give at checkout (name, email, address, payment
+          details), under its own privacy policy, which is linked in the checkout.
         </p>
       </LegalSection>
 
@@ -58,15 +52,15 @@ export default function PrivacyPage() {
         <LegalList
           items={[
             <>
-              <b>Account details:</b> your email address, an optional display name, and your password (stored only as a secure hash by our sign-in provider). If you sign in
-              with Google, we receive your Google email address and basic profile (name and picture) from Google.
+              <b>Account details:</b> your email address, an optional display name, and your password (stored only as a secure hash). If you sign in with a third-party
+              account such as Google, we receive that account&apos;s email address and basic profile (name and picture).
             </>,
             <>
               <b>Your content:</b> projects (slides, text, settings), and the files you upload — screenshots, screen recordings, app icons, music, and fonts.
             </>,
             <>
-              <b>Plan and billing records:</b> your plan, subscription status and dates, and records of purchases that Paddle sends us (Paddle customer and transaction
-              IDs, product, price, country, and amounts). We do not receive your card number.
+              <b>Plan and billing records:</b> your plan, subscription status and dates, and records of purchases that our payment partner sends us (customer and
+              transaction IDs, product, price, country, and amounts). We do not receive your card number.
             </>,
             <>
               <b>Usage and security data:</b> counts of AI feature uses and project creation (to apply plan limits), the devices and browsers you&apos;re signed in on with
@@ -111,29 +105,30 @@ export default function PrivacyPage() {
 
       <LegalSection title="4. AI features">
         <p>
-          AI Director, Detect elements and AI translation work only when you click them. They send the screenshots (resized) or text you chose to Anthropic, which returns
-          suggestions. Under Anthropic&apos;s commercial terms this data is not used to train its models and is kept only for a limited period for safety and abuse
+          AI Director, Detect elements and AI translation work only when you click them. They send the screenshots (resized) or text you chose to our AI provider, which
+          returns suggestions. Under our agreement with it, this data is not used to train AI models and is kept only for a limited period for safety and abuse
           monitoring. We store the suggestions you apply as part of your project, and a count of each use.
         </p>
       </LegalSection>
 
       <LegalSection title="5. Who processes your data">
-        <p>We use these service providers. Each processes data only to provide its service to us, under a data processing agreement or equivalent terms:</p>
+        <p>
+          We use carefully chosen service providers in these categories. Each processes data only to provide its service to us, under a data processing agreement or
+          equivalent terms:
+        </p>
         <div className="overflow-x-auto rounded-xl border border-black/10 dark:border-white/10">
           <table className="w-full min-w-[560px] text-[13.5px]">
             <thead>
               <tr>
-                <th className={TH}>Provider</th>
+                <th className={TH}>Category</th>
                 <th className={TH}>Used for</th>
                 <th className={TH}>Location</th>
               </tr>
             </thead>
             <tbody>
-              {PROCESSORS.map(([name, use, where, url]) => (
+              {PROCESSORS.map(([name, use, where]) => (
                 <tr key={name}>
-                  <td className={TD}>
-                    <A href={url}>{name}</A>
-                  </td>
+                  <td className={TD}>{name}</td>
                   <td className={TD}>{use}</td>
                   <td className={TD}>{where}</td>
                 </tr>
@@ -141,7 +136,10 @@ export default function PrivacyPage() {
             </tbody>
           </table>
         </div>
-        <p>We may also disclose data if the law requires it, or to protect the rights and safety of our users or the public.</p>
+        <p>
+          A current list of our service providers is available on request at <Mail subject="Nimina — list of service providers" />. We may also disclose data if the law
+          requires it, or to protect the rights and safety of our users or the public.
+        </p>
       </LegalSection>
 
       <LegalSection title="6. International transfers">
@@ -171,7 +169,7 @@ export default function PrivacyPage() {
           items={[
             'Sign-in cookies that keep you logged in, and a “Stay signed in” preference cookie. If you untick “Stay signed in”, they end when you close the browser.',
             'Your browser’s local storage for editor conveniences, such as panel widths, timeline zoom and recently used music. This stays on your device.',
-            'On the Pricing page and at checkout, Paddle’s checkout script sets the cookies it needs to process payments securely, under Paddle’s policy.',
+            'On the Pricing page and at checkout, our payment partner’s checkout sets the cookies it needs to process payments securely, under its own policy.',
           ]}
         />
       </LegalSection>

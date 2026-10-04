@@ -445,7 +445,9 @@ FAQPage, no ratings) and its FAQ answers stay in the HTML when collapsed.
 contact email, refund window, minimum age and "last updated" live in
 `src/lib/legal.ts` — change facts there, and bump `updated` when a page's
 meaning changes). Every claim in them describes what the app actually does
-(Paddle as Merchant of Record, the processors and their regions, retention
+(Paddle as Merchant of Record — named in Terms/Refunds/Pricing as Paddle
+requires; the Privacy page lists processors by category and region only,
+names on request — retention
 incl. 8-week backups, deletion behaviour, AI via Anthropic); keep them in
 step when that changes. `/pricing` ends with a plan comparison and billing
 FAQ (`PlanDetails.tsx`) read from `PLAN_LIMITS`. They were drafted without a

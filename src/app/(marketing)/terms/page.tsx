@@ -135,7 +135,7 @@ export default function TermsPage() {
       <LegalSection title="8. AI features">
         <LegalList
           items={[
-            'AI Director, Detect elements and AI translation send the screenshots or text you choose to our AI provider, Anthropic, to produce suggestions. They are only used when you click the button. Anthropic does not use this data to train its models.',
+            'AI Director, Detect elements and AI translation send the screenshots or text you choose to our AI provider to produce suggestions. They are only used when you click the button. That data is not used to train AI models.',
             'AI output can be wrong or unsuitable. Every suggestion is shown to you before it is applied — you decide what to use and remain responsible for the final video, including checking translations.',
             'Each plan includes a monthly number of AI uses, shown next to each AI button and on your account page. Unused uses don’t carry over. If our AI provider is unavailable, AI features may be temporarily unavailable.',
           ]}
